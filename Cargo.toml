@@ -1,0 +1,16 @@
+[package]
+name = "criticalmass"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# winit = "*"
+env_logger = "*"
+pollster = "*"
+# log = "*"
+
+glfw = "*"
+# requires at least glfw 3.4 dev
+# if building from source, run `sudo apt install libxcursor-dev libxi-de`
+
+wgpu = "*"
