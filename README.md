@@ -1,7 +1,7 @@
 # CriticalMass
 Critical Mass, rewritten in rust
 
-##...why?
+## ...why?
 
 * for fun
 * as a learning experience
