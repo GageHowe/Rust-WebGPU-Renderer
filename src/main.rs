@@ -1,7 +1,7 @@
 use glfw::{fail_on_errors, Action, Key, Window, WindowHint, ClientApiHint};
 use wgpu::ExperimentalFeatures;
 mod renderer_backend;
-use renderer_backend::pipeline_builder::PipelineBuilder;
+use renderer_backend::{pipeline_builder::PipelineBuilder, mesh_builder};
 
 struct State<'a> {
     instance: wgpu::Instance,
@@ -12,6 +12,7 @@ struct State<'a> {
     size: (i32, i32),
     window: &'a mut Window,
     render_pipeline: wgpu::RenderPipeline,
+    triangle_mesh: wgpu::Buffer,
 }
 
 impl<'a> State<'a> {
@@ -67,10 +68,13 @@ impl<'a> State<'a> {
         };
         surface.configure(&device, &config);
 
+        let triangle_buffer = mesh_builder::make_triangle(&device);
         let mut pipeline_builder = PipelineBuilder::new();
         pipeline_builder.set_shader_module("shaders/shader.wgsl", "vs_main", "fs_main");
         pipeline_builder.set_pixel_format(config.format);
+        pipeline_builder.add_vertex_buffer_layout(mesh_builder::Vertex::get_layout());
         let render_pipeline = pipeline_builder.build_pipeline(&device);
+        pipeline_builder.reset();
 
         Self {
             instance,
@@ -81,6 +85,7 @@ impl<'a> State<'a> {
             config,
             size,
             render_pipeline,
+            triangle_mesh: triangle_buffer
         }
     }
 
@@ -96,7 +101,7 @@ impl<'a> State<'a> {
     fn update_surface(&mut self) {
         self.surface = self.instance.create_surface(self.window.render_context()).unwrap();
     }
-
+   
     fn render(&mut self) -> Result<(), wgpu::SurfaceError>{
 
         let drawable = self.surface.get_current_texture()?;
@@ -120,7 +125,7 @@ impl<'a> State<'a> {
                 }),
                 store: wgpu::StoreOp::Store,
             },
-            depth_slice: None, // should this be 0?
+            depth_slice: None,
         };
 
         let render_pass_descriptor = wgpu::RenderPassDescriptor {
@@ -134,6 +139,7 @@ impl<'a> State<'a> {
         {
             let mut renderpass = command_encoder.begin_render_pass(&render_pass_descriptor);
             renderpass.set_pipeline(&self.render_pipeline);
+            renderpass.set_vertex_buffer(0, self.triangle_mesh.slice(..));
             renderpass.draw(0..3, 0..1);
         }
         self.queue.submit(std::iter::once(command_encoder.finish()));

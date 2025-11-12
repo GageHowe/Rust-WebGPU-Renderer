@@ -4,15 +4,16 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-# winit = "*"
+# winit = "*" # all my homies hate winit
 env_logger = "*"
 pollster = "*"
 # log = "*"
 rapier3d = { version = "*", features = [ "simd-stable" ] }
 
-
-glfw = "*"
 # requires at least glfw 3.4 dev
 # if building from source, run `sudo apt install libxcursor-dev libxi-de`
-
+glfw = "*"
 wgpu = "*"
+glm = "*"
+
+# potentially use https://github.com/Ralith/openxrs

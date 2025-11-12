@@ -6,6 +6,7 @@ pub struct PipelineBuilder {
     vertex_entry: String,
     fragment_entry: String,
     pixel_format: wgpu::TextureFormat,
+    vertex_buffer_layouts: Vec<wgpu::VertexBufferLayout<'static>>,
 }
 
 impl PipelineBuilder {
@@ -16,7 +17,16 @@ impl PipelineBuilder {
             vertex_entry: "dummy".to_string(),
             fragment_entry: "dummy".to_string(),
             pixel_format: wgpu::TextureFormat::Rgba8Unorm,
+            vertex_buffer_layouts: Vec::new(),
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.vertex_buffer_layouts.clear();
+    }
+
+    pub fn add_vertex_buffer_layout(&mut self, layout: wgpu::VertexBufferLayout<'static>) {
+        self.vertex_buffer_layouts.push(layout);
     }
 
     pub fn set_shader_module(&mut self, shader_filename: &str, vertex_entry: &str, fragment_entry: &str) {
@@ -65,7 +75,8 @@ impl PipelineBuilder {
             vertex: wgpu::VertexState {
                 module: &shader_module,
                 entry_point: Some(&self.vertex_entry),
-                buffers: &[],
+                //     buffers: &[],
+                buffers: &self.vertex_buffer_layouts, // changed to not be empty
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
 
@@ -81,13 +92,9 @@ impl PipelineBuilder {
 
             fragment: Some(wgpu::FragmentState {
                 module: &shader_module,
-                // entry_point: &self.fragment_entry,
                 entry_point: Some(&self.fragment_entry),
                 targets: &render_targets,
-				compilation_options: wgpu::PipelineCompilationOptions{
-                    constants: &[],
-                    zero_initialize_workgroup_memory: false,
-                },
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
             }),
 
             depth_stencil: None,
@@ -97,12 +104,6 @@ impl PipelineBuilder {
                 alpha_to_coverage_enabled: false,
             },
             multiview: None,
-
-            // cache: Some(unsafe{&device.create_pipeline_cache(&wgpu::PipelineCacheDescriptor {
-            //     label: Some("NewPipelineCache"),
-            //     data: None,
-            //     fallback: false,
-            // })}),
             cache: None,
         };
 
