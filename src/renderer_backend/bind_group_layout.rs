@@ -15,7 +15,6 @@ impl<'a> Builder<'a> {
         self.entries.clear();
     }
 
-    // CONSIDER: taking in stage and visibility as parameters
     pub fn add_material(&mut self) {
         self.entries.push(wgpu::BindGroupLayoutEntry {
             binding: self.entries.len() as u32,
