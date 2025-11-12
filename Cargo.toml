@@ -17,3 +17,4 @@ wgpu = "*"
 glm = "*"
 
 # potentially use https://github.com/Ralith/openxrs
+# potentially use mlua for game logic and scripting

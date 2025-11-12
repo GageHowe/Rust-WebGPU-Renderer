@@ -1,7 +1,7 @@
-use glfw::{fail_on_errors, Action, Key, Window, WindowHint, ClientApiHint};
+use glfw::{Action, ClientApiHint, Key, Window, WindowHint, fail_on_errors};
 use wgpu::ExperimentalFeatures;
 mod renderer_backend;
-use renderer_backend::{pipeline_builder::PipelineBuilder, mesh_builder};
+use renderer_backend::{mesh_builder, pipeline_builder::PipelineBuilder};
 
 struct State<'a> {
     instance: wgpu::Instance,
@@ -13,16 +13,16 @@ struct State<'a> {
     window: &'a mut Window,
     render_pipeline: wgpu::RenderPipeline,
     triangle_mesh: wgpu::Buffer,
+    quad_mesh: mesh_builder::Mesh,
 }
 
 impl<'a> State<'a> {
-
     async fn new(window: &'a mut Window) -> Self {
-
         let size = window.get_framebuffer_size();
 
         let instance_descriptor = wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::all(), ..Default::default()
+            backends: wgpu::Backends::all(),
+            ..Default::default()
         };
         let instance = wgpu::Instance::new(&instance_descriptor);
         let surface = instance.create_surface(window.render_context()).unwrap();
@@ -32,8 +32,7 @@ impl<'a> State<'a> {
             compatible_surface: Some(&surface),
             force_fallback_adapter: false,
         };
-        let adapter = instance.request_adapter(&adapter_descriptor)
-            .await.unwrap();
+        let adapter = instance.request_adapter(&adapter_descriptor).await.unwrap();
 
         let device_descriptor = wgpu::DeviceDescriptor {
             required_features: wgpu::Features::empty(),
@@ -42,18 +41,16 @@ impl<'a> State<'a> {
             experimental_features: ExperimentalFeatures::default(),
             memory_hints: wgpu::MemoryHints::Performance, // favor performance over memory usage
             trace: wgpu::Trace::default(),
-            // features: wgpu::Features::PIPELINE_CACHE, 
+            // features: wgpu::Features::PIPELINE_CACHE,
         };
-        let (device, queue) = adapter
-            .request_device(&device_descriptor)
-            .await.unwrap();
+        let (device, queue) = adapter.request_device(&device_descriptor).await.unwrap();
 
         let surface_capabilities = surface.get_capabilities(&adapter);
         let surface_format = surface_capabilities
             .formats
             .iter()
             .copied()
-            .filter(|f | f.is_srgb())
+            .filter(|f| f.is_srgb())
             .next()
             .unwrap_or(surface_capabilities.formats[0]);
         let config = wgpu::SurfaceConfiguration {
@@ -64,11 +61,14 @@ impl<'a> State<'a> {
             present_mode: surface_capabilities.present_modes[0],
             alpha_mode: surface_capabilities.alpha_modes[0],
             view_formats: vec![],
-            desired_maximum_frame_latency: 2
+            desired_maximum_frame_latency: 2,
         };
         surface.configure(&device, &config);
 
         let triangle_buffer = mesh_builder::make_triangle(&device);
+
+        let quad_mesh = mesh_builder::make_quad(&device);
+
         let mut pipeline_builder = PipelineBuilder::new();
         pipeline_builder.set_shader_module("shaders/shader.wgsl", "vs_main", "fs_main");
         pipeline_builder.set_pixel_format(config.format);
@@ -85,7 +85,8 @@ impl<'a> State<'a> {
             config,
             size,
             render_pipeline,
-            triangle_mesh: triangle_buffer
+            triangle_mesh: triangle_buffer,
+            quad_mesh,
         }
     }
 
@@ -99,19 +100,23 @@ impl<'a> State<'a> {
     }
 
     fn update_surface(&mut self) {
-        self.surface = self.instance.create_surface(self.window.render_context()).unwrap();
+        self.surface = self
+            .instance
+            .create_surface(self.window.render_context())
+            .unwrap();
     }
-   
-    fn render(&mut self) -> Result<(), wgpu::SurfaceError>{
 
+    fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         let drawable = self.surface.get_current_texture()?;
         let image_view_descriptor = wgpu::TextureViewDescriptor::default();
         let image_view = drawable.texture.create_view(&image_view_descriptor);
 
         let command_encoder_descriptor = wgpu::CommandEncoderDescriptor {
-            label: Some("Render Encoder")
+            label: Some("Render Encoder"),
         };
-        let mut command_encoder = self.device.create_command_encoder(&command_encoder_descriptor);
+        let mut command_encoder = self
+            .device
+            .create_command_encoder(&command_encoder_descriptor);
 
         let color_attachment = wgpu::RenderPassColorAttachment {
             view: &image_view,
@@ -121,7 +126,7 @@ impl<'a> State<'a> {
                     r: 0.75,
                     g: 0.5,
                     b: 0.25,
-                    a: 1.0
+                    a: 1.0,
                 }),
                 store: wgpu::StoreOp::Store,
             },
@@ -133,12 +138,20 @@ impl<'a> State<'a> {
             color_attachments: &[Some(color_attachment)],
             depth_stencil_attachment: None,
             occlusion_query_set: None,
-            timestamp_writes: None
+            timestamp_writes: None,
         };
 
         {
             let mut renderpass = command_encoder.begin_render_pass(&render_pass_descriptor);
             renderpass.set_pipeline(&self.render_pipeline);
+
+            renderpass.set_vertex_buffer(0, self.quad_mesh.vertex_buffer.slice(..));
+            renderpass.set_index_buffer(
+                self.quad_mesh.index_buffer.slice(..),
+                wgpu::IndexFormat::Uint16,
+            );
+            renderpass.draw_indexed(0..6, 0, 0..1);
+
             renderpass.set_vertex_buffer(0, self.triangle_mesh.slice(..));
             renderpass.draw(0..3, 0..1);
         }
@@ -151,17 +164,14 @@ impl<'a> State<'a> {
 }
 
 async fn run() {
-
-    let mut glfw = glfw::init(fail_on_errors!())
-        .unwrap();
+    let mut glfw = glfw::init(fail_on_errors!()).unwrap();
     glfw.window_hint(WindowHint::ClientApi(ClientApiHint::NoApi));
     // glfw.window_hint(glfw::WindowHint::Focused(false)); // found on reddit
 
-    let (mut window, events) = 
-        glfw.create_window(
-            800, 600, "HELL YEAH", 
-            glfw::WindowMode::Windowed).unwrap();
-    
+    let (mut window, events) = glfw
+        .create_window(800, 600, "HELL YEAH", glfw::WindowMode::Windowed)
+        .unwrap();
+
     let mut state = State::new(&mut window).await;
 
     state.window.set_framebuffer_size_polling(true);
@@ -173,7 +183,6 @@ async fn run() {
         glfw.poll_events();
         for (_, event) in glfw::flush_messages(&events) {
             match event {
-
                 //Hit escape
                 glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
                     state.window.set_should_close(true)
@@ -195,14 +204,13 @@ async fn run() {
         }
 
         match state.render() {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
                 state.update_surface();
                 state.resize(state.size);
-            },
+            }
             Err(e) => eprintln!("{:?}", e),
         }
-        
     }
 }
 
