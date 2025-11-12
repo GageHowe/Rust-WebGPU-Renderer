@@ -175,9 +175,9 @@ impl<'a> State<'a> {
             renderpass.set_pipeline(&self.render_pipeline);
 
             renderpass.set_bind_group(0, &self.quad_material.bind_group, &[]);
-            renderpass.set_vertex_buffer(0, self.quad_mesh.vertex_buffer.slice(..));
+            renderpass.set_vertex_buffer(0, self.quad_mesh.buffer.slice(0..self.quad_mesh.offset));
             renderpass.set_index_buffer(
-                self.quad_mesh.index_buffer.slice(..),
+                self.quad_mesh.buffer.slice(self.quad_mesh.offset..),
                 wgpu::IndexFormat::Uint16,
             );
             renderpass.draw_indexed(0..6, 0, 0..1);
@@ -187,7 +187,6 @@ impl<'a> State<'a> {
             renderpass.draw(0..3, 0..1);
         }
         self.queue.submit(std::iter::once(command_encoder.finish()));
-
         drawable.present();
 
         Ok(())

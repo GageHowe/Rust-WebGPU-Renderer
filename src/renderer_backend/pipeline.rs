@@ -88,10 +88,7 @@ impl<'a> Builder<'a> {
                 module: &shader_module,
                 entry_point: Some(&self.vertex_entry),
                 buffers: &self.vertex_buffer_layouts,
-                compilation_options: wgpu::PipelineCompilationOptions {
-                    constants: &[],
-                    zero_initialize_workgroup_memory: false, // should this be true? idk
-                },
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
 
             primitive: wgpu::PrimitiveState {
@@ -108,10 +105,7 @@ impl<'a> Builder<'a> {
                 module: &shader_module,
                 entry_point: Some(&self.fragment_entry),
                 targets: &render_targets,
-                compilation_options: wgpu::PipelineCompilationOptions {
-                    constants: &[],
-                    zero_initialize_workgroup_memory: false,
-                },
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
             }),
 
             depth_stencil: None,
