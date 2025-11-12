@@ -1,5 +1,7 @@
 use glfw::{fail_on_errors, Action, Key, Window, WindowHint, ClientApiHint};
 use wgpu::ExperimentalFeatures;
+mod renderer_backend;
+use renderer_backend::pipeline_builder::PipelineBuilder;
 
 struct State<'a> {
     instance: wgpu::Instance,
@@ -9,6 +11,7 @@ struct State<'a> {
     config: wgpu::SurfaceConfiguration,
     size: (i32, i32),
     window: &'a mut Window,
+    render_pipeline: wgpu::RenderPipeline,
 }
 
 impl<'a> State<'a> {
@@ -38,6 +41,7 @@ impl<'a> State<'a> {
             experimental_features: ExperimentalFeatures::default(),
             memory_hints: wgpu::MemoryHints::Performance, // favor performance over memory usage
             trace: wgpu::Trace::default(),
+            // features: wgpu::Features::PIPELINE_CACHE, 
         };
         let (device, queue) = adapter
             .request_device(&device_descriptor)
@@ -63,6 +67,11 @@ impl<'a> State<'a> {
         };
         surface.configure(&device, &config);
 
+        let mut pipeline_builder = PipelineBuilder::new();
+        pipeline_builder.set_shader_module("shaders/shader.wgsl", "vs_main", "fs_main");
+        pipeline_builder.set_pixel_format(config.format);
+        let render_pipeline = pipeline_builder.build_pipeline(&device);
+
         Self {
             instance,
             window,
@@ -71,6 +80,7 @@ impl<'a> State<'a> {
             queue,
             config,
             size,
+            render_pipeline,
         }
     }
 
@@ -110,7 +120,7 @@ impl<'a> State<'a> {
                 }),
                 store: wgpu::StoreOp::Store,
             },
-            depth_slice: None,
+            depth_slice: None, // should this be 0?
         };
 
         let render_pass_descriptor = wgpu::RenderPassDescriptor {
@@ -121,7 +131,11 @@ impl<'a> State<'a> {
             timestamp_writes: None
         };
 
-        command_encoder.begin_render_pass(&render_pass_descriptor);
+        {
+            let mut renderpass = command_encoder.begin_render_pass(&render_pass_descriptor);
+            renderpass.set_pipeline(&self.render_pipeline);
+            renderpass.draw(0..3, 0..1);
+        }
         self.queue.submit(std::iter::once(command_encoder.finish()));
 
         drawable.present();
@@ -139,7 +153,7 @@ async fn run() {
 
     let (mut window, events) = 
         glfw.create_window(
-            800, 600, "It's WGPU time.", 
+            800, 600, "HELL YEAH", 
             glfw::WindowMode::Windowed).unwrap();
     
     let mut state = State::new(&mut window).await;

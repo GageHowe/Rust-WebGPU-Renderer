@@ -8,6 +8,8 @@ edition = "2024"
 env_logger = "*"
 pollster = "*"
 # log = "*"
+rapier3d = { version = "*", features = [ "simd-stable" ] }
+
 
 glfw = "*"
 # requires at least glfw 3.4 dev
