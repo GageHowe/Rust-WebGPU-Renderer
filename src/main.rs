@@ -1,321 +1,40 @@
-use glfw::{Action, ClientApiHint, Key, Window, WindowHint, fail_on_errors};
-use wgpu::ExperimentalFeatures;
-mod renderer_backend;
-use renderer_backend::{bind_group_layout, material::Material, mesh_builder, pipeline, ubo::UBO};
+// #![feature(slice_as_array)]
+
+use std::sync::Mutex;
+
+use glfw::{Action, ClientApiHint, Key, WindowHint, fail_on_errors};
+mod renderer;
+use renderer::renderer::State;
 mod model;
-use glm::ext;
-use model::game_object::Object;
+use model::{game_objects::Object, world::World};
+mod engine;
+mod physics;
+mod utility;
+use crate::physics::physics::PhysicsWorld;
+use physics::*;
+use rapier3d::math::Vector;
+use rapier3d::prelude::*;
+use std::sync::Arc;
 
-struct World {
-    quads: Vec<Object>,
-    tris: Vec<Object>,
+pub struct AppState {
+    pub phys_world: Mutex<PhysicsWorld>,
 }
 
-impl World {
-    fn new() -> Self {
-        World {
-            quads: Vec::new(),
-            tris: Vec::new(),
-        }
-    }
-
-    fn update(&mut self, dt: f32) {
-        for i in 0..self.tris.len() {
-            self.tris[i].angle = self.tris[i].angle + 0.001 * dt;
-            if self.tris[i].angle > 360.0 {
-                self.tris[i].angle -= 360.0;
-            }
+impl AppState {
+    /// consume and guard the physics world
+    pub fn new(world: PhysicsWorld) -> Self {
+        AppState {
+            phys_world: Mutex::new(world),
         }
     }
 }
 
-struct State<'a> {
-    instance: wgpu::Instance,
-    surface: wgpu::Surface<'a>,
-    device: wgpu::Device,
-    queue: wgpu::Queue,
-    config: wgpu::SurfaceConfiguration,
-    size: (i32, i32),
-    window: &'a mut Window,
-    render_pipeline: wgpu::RenderPipeline,
-    triangle_mesh: wgpu::Buffer,
-    quad_mesh: mesh_builder::Mesh,
-    triangle_material: Material,
-    quad_material: Material,
-    ubo: Option<UBO>,
-}
-
-impl<'a> State<'a> {
-    async fn new(window: &'a mut Window) -> Self {
-        let size = window.get_framebuffer_size();
-
-        let instance_descriptor = wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::all(),
-            ..Default::default()
-        };
-        let instance = wgpu::Instance::new(&instance_descriptor);
-        let surface = instance.create_surface(window.render_context()).unwrap();
-
-        let adapter_descriptor = wgpu::RequestAdapterOptionsBase {
-            power_preference: wgpu::PowerPreference::default(),
-            compatible_surface: Some(&surface),
-            force_fallback_adapter: false,
-        };
-        let adapter = instance.request_adapter(&adapter_descriptor).await.unwrap();
-
-        let device_descriptor = wgpu::DeviceDescriptor {
-            required_features: wgpu::Features::empty(),
-            required_limits: wgpu::Limits::default(),
-            label: Some("Device"),
-            experimental_features: ExperimentalFeatures::default(),
-            memory_hints: wgpu::MemoryHints::Performance, // favor performance over memory usage
-            trace: wgpu::Trace::default(),
-            // features: wgpu::Features::PIPELINE_CACHE,
-        };
-        let (device, queue) = adapter.request_device(&device_descriptor).await.unwrap();
-
-        let surface_capabilities = surface.get_capabilities(&adapter);
-        let surface_format = surface_capabilities
-            .formats
-            .iter()
-            .copied()
-            .filter(|f| f.is_srgb())
-            .next()
-            .unwrap_or(surface_capabilities.formats[0]);
-        let config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface_format,
-            width: size.0 as u32,
-            height: size.1 as u32,
-            present_mode: surface_capabilities.present_modes[0],
-            alpha_mode: surface_capabilities.alpha_modes[0],
-            view_formats: vec![],
-            desired_maximum_frame_latency: 2,
-        };
-        surface.configure(&device, &config);
-
-        let triangle_buffer = mesh_builder::make_triangle(&device);
-
-        let quad_mesh = mesh_builder::make_quad(&device);
-
-        let material_bind_group_layout;
-        {
-            let mut builder = bind_group_layout::Builder::new(&device);
-            builder.add_material();
-            material_bind_group_layout = builder.build("Material Bind Group Layout");
-        }
-
-        let ubo_bind_group_layout;
-        {
-            let mut builder = bind_group_layout::Builder::new(&device);
-            builder.add_ubo();
-            ubo_bind_group_layout = builder.build("UBO Bind Group Layout");
-        }
-
-        let render_pipeline: wgpu::RenderPipeline;
-        {
-            let mut builder = pipeline::Builder::new(&device);
-            builder.set_shader_module("shaders/shader.wgsl", "vs_main", "fs_main");
-            builder.set_pixel_format(config.format);
-            builder.add_vertex_buffer_layout(mesh_builder::Vertex::get_layout());
-            builder.add_bind_group_layout(&material_bind_group_layout);
-            builder.add_bind_group_layout(&ubo_bind_group_layout);
-            render_pipeline = builder.build("Render Pipeline");
-        }
-
-        let triangle_material = Material::new(
-            "../images/wgpu.png",
-            &device,
-            &queue,
-            "Triangle Material",
-            &material_bind_group_layout,
-        );
-        let quad_material = Material::new(
-            "../images/rust.jpg",
-            &device,
-            &queue,
-            "Quad Material",
-            &material_bind_group_layout,
-        );
-
-        Self {
-            instance,
-            window,
-            surface,
-            device,
-            queue,
-            config,
-            size,
-            render_pipeline,
-            triangle_mesh: triangle_buffer,
-            quad_mesh,
-            triangle_material: triangle_material,
-            quad_material: quad_material,
-            ubo: None,
-        }
-    }
-
-    pub fn build_ubos_for_objects(&mut self, object_count: usize) {
-        let ubo_bind_group_layout;
-        {
-            let mut builder = bind_group_layout::Builder::new(&self.device);
-            builder.add_ubo();
-            ubo_bind_group_layout = builder.build("UBO Bind Group Layout");
-        }
-        self.ubo = Some(UBO::new(&self.device, object_count, ubo_bind_group_layout));
-    }
-
-    fn resize(&mut self, new_size: (i32, i32)) {
-        if new_size.0 > 0 && new_size.1 > 0 {
-            self.size = new_size;
-            self.config.width = new_size.0 as u32;
-            self.config.height = new_size.1 as u32;
-            self.surface.configure(&self.device, &self.config);
-        }
-    }
-
-    fn update_surface(&mut self) {
-        self.surface = self
-            .instance
-            .create_surface(self.window.render_context())
-            .unwrap();
-    }
-
-    fn render(
-        &mut self,
-        quads: &Vec<Object>,
-        tris: &Vec<Object>,
-    ) -> Result<(), wgpu::SurfaceError> {
-        let _ = self.device.poll(wgpu::PollType::Wait {
-            // updated from deprecated Maintain
-            submission_index: None,
-            timeout: None,
-        });
-
-        // Upload
-        let mut offset: u64 = 0;
-        for i in 0..quads.len() {
-            let c0 = glm::Vec4::new(1.0, 0.0, 0.0, 0.0);
-            let c1 = glm::Vec4::new(0.0, 1.0, 0.0, 0.0);
-            let c2 = glm::Vec4::new(0.0, 0.0, 1.0, 0.0);
-            let c3 = glm::Vec4::new(0.0, 0.0, 0.0, 1.0);
-            let m1 = glm::Matrix4::new(c0, c1, c2, c3);
-            let m2 = glm::Matrix4::new(c0, c1, c2, c3);
-            let matrix = ext::rotate(&m2, quads[i].angle, glm::Vector3::new(0.0, 0.0, 1.0))
-                * ext::translate(&m1, quads[i].position);
-            self.ubo
-                .as_mut()
-                .unwrap()
-                .upload(offset + i as u64, &matrix, &self.queue);
-        }
-
-        offset = quads.len() as u64;
-        for i in 0..tris.len() {
-            // make identity matrix, not sure why glm doesnt include this
-            let c0 = glm::Vec4::new(1.0, 0.0, 0.0, 0.0);
-            let c1 = glm::Vec4::new(0.0, 1.0, 0.0, 0.0);
-            let c2 = glm::Vec4::new(0.0, 0.0, 1.0, 0.0);
-            let c3 = glm::Vec4::new(0.0, 0.0, 0.0, 1.0);
-            let m1 = glm::Matrix4::new(c0, c1, c2, c3);
-            let m2 = glm::Matrix4::new(c0, c1, c2, c3);
-            let matrix = ext::rotate(&m2, tris[i].angle, glm::Vector3::new(0.0, 0.0, 1.0))
-                * ext::translate(&m1, tris[i].position);
-            self.ubo
-                .as_mut()
-                .unwrap()
-                .upload(offset + i as u64, &matrix, &self.queue);
-        }
-
-        let event = self.queue.submit([]);
-        // let maintain = wgpu::Maintain::WaitForSubmissionIndex(event);
-        // self.device.poll(maintain);
-        let _ = self.device.poll(wgpu::PollType::wait_indefinitely());
-
-        let drawable = self.surface.get_current_texture()?;
-        let image_view_descriptor = wgpu::TextureViewDescriptor::default();
-        let image_view = drawable.texture.create_view(&image_view_descriptor);
-
-        let command_encoder_descriptor = wgpu::CommandEncoderDescriptor {
-            label: Some("Render Encoder"),
-        };
-        let mut command_encoder = self
-            .device
-            .create_command_encoder(&command_encoder_descriptor);
-
-        let color_attachment = wgpu::RenderPassColorAttachment {
-            view: &image_view,
-            resolve_target: None,
-            ops: wgpu::Operations {
-                load: wgpu::LoadOp::Clear(wgpu::Color {
-                    r: 0.75,
-                    g: 0.5,
-                    b: 0.25,
-                    a: 1.0,
-                }),
-                store: wgpu::StoreOp::Store,
-            },
-            depth_slice: None,
-        };
-
-        let render_pass_descriptor = wgpu::RenderPassDescriptor {
-            label: Some("Render Pass"),
-            color_attachments: &[Some(color_attachment)],
-            depth_stencil_attachment: None,
-            occlusion_query_set: None,
-            timestamp_writes: None,
-        };
-
-        {
-            let mut renderpass = command_encoder.begin_render_pass(&render_pass_descriptor);
-            renderpass.set_pipeline(&self.render_pipeline);
-
-            // Quads
-            renderpass.set_bind_group(0, &self.quad_material.bind_group, &[]);
-            renderpass.set_vertex_buffer(0, self.quad_mesh.buffer.slice(0..self.quad_mesh.offset));
-            renderpass.set_index_buffer(
-                self.quad_mesh.buffer.slice(self.quad_mesh.offset..),
-                wgpu::IndexFormat::Uint16,
-            );
-            let mut offset: usize = 0;
-            for i in 0..quads.len() {
-                renderpass.set_bind_group(
-                    1,
-                    &(self.ubo.as_ref().unwrap()).bind_groups[offset + i],
-                    &[],
-                );
-                renderpass.draw_indexed(0..6, 0, 0..1);
-            }
-
-            // Triangles
-            renderpass.set_bind_group(0, &self.triangle_material.bind_group, &[]);
-            renderpass.set_vertex_buffer(0, self.triangle_mesh.slice(..));
-            offset = quads.len();
-            for i in 0..tris.len() {
-                renderpass.set_bind_group(
-                    1,
-                    &(self.ubo.as_ref().unwrap()).bind_groups[offset + i],
-                    &[],
-                );
-                renderpass.draw(0..3, 0..1);
-            }
-        }
-        self.queue.submit(std::iter::once(command_encoder.finish()));
-        let _ = self.device.poll(wgpu::PollType::Wait {
-            submission_index: None,
-            timeout: None,
-        });
-
-        drawable.present();
-
-        Ok(())
-    }
-}
-
+/// starts wgpu setup and loop
 async fn run() {
     let mut glfw = glfw::init(fail_on_errors!()).unwrap();
     glfw.window_hint(WindowHint::ClientApi(ClientApiHint::NoApi));
     let (mut window, events) = glfw
-        .create_window(800, 600, "wgpu test", glfw::WindowMode::Windowed)
+        .create_window(800, 600, "wgpu", glfw::WindowMode::Windowed)
         .unwrap();
 
     let mut state = State::new(&mut window).await;
@@ -324,15 +43,18 @@ async fn run() {
     state.window.set_key_polling(true);
     state.window.set_mouse_button_polling(true);
     state.window.set_pos_polling(true);
+    state.window.set_cursor_mode(glfw::CursorMode::Hidden);
+
+    state.load_assets();
 
     // Build world
     let mut world = World::new();
     world.tris.push(Object {
-        position: glm::Vec3::new(0.0, 0.0, 0.0),
+        position: glm::Vec3::new(0.0, 0.0, -1.0),
         angle: 0.0,
     });
     world.quads.push(Object {
-        position: glm::Vec3::new(0.5, 0.0, 0.0),
+        position: glm::Vec3::new(0.5, 0.0, -1.5),
         angle: 0.0,
     });
     state.build_ubos_for_objects(2);
@@ -340,22 +62,30 @@ async fn run() {
     while !state.window.should_close() {
         glfw.poll_events();
 
-        world.update(16.67);
+        world.update(16.67, state.window);
 
         for (_, event) in glfw::flush_messages(&events) {
             match event {
-                //Hit escape
+                //esc
                 glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
                     state.window.set_should_close(true)
                 }
 
-                //Window was moved
-                glfw::WindowEvent::Pos(..) => {
-                    state.update_surface();
-                    state.resize(state.size); // crashes on move without this
+                // press or release any key
+                glfw::WindowEvent::Key(key, _, Action::Press, _) => {
+                    world.set_key(key, true);
+                }
+                glfw::WindowEvent::Key(key, _, Action::Release, _) => {
+                    world.keys.insert(key, false);
                 }
 
-                //Window was resized
+                // window moved
+                glfw::WindowEvent::Pos(..) => {
+                    state.update_surface();
+                    state.resize(state.size);
+                }
+
+                // window resized
                 glfw::WindowEvent::FramebufferSize(width, height) => {
                     state.update_surface();
                     state.resize((width, height));
@@ -364,7 +94,7 @@ async fn run() {
             }
         }
 
-        match state.render(&world.quads, &world.tris) {
+        match state.render(&world.quads, &world.tris, &world.camera) {
             Ok(_) => {}
             Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
                 state.update_surface();
@@ -375,6 +105,44 @@ async fn run() {
     }
 }
 
+/// starts the physics thread. This should only be running once
+fn physics_thread(appstate: AppState) {
+    println!("Physics thread starting");
+
+    let mut physics = appstate.phys_world.lock().unwrap();
+
+    let ground = ColliderBuilder::cuboid(100.0, 0.1, 100.0).build();
+
+    {
+        // does this work?
+        physics.collider_set.insert(ground);
+    }
+    let ball = RigidBodyBuilder::dynamic()
+        .translation(vector![0.0, 10.0, 0.0])
+        .build();
+    let ball_collider = ColliderBuilder::ball(0.5).restitution(0.7).build();
+    let ball_handle = physics.rigid_body_set.insert(ball);
+
+    let PhysicsWorld {
+        // weird borrow checker worship
+        rigid_body_set,
+        collider_set,
+        ..
+    } = &mut *physics;
+    collider_set.insert_with_parent(ball_collider, ball_handle, rigid_body_set);
+
+    for _ in 0..200 {
+        physics.step();
+
+        let ball_body = &physics.rigid_body_set[ball_handle];
+        println!("Ball altitude: {}", ball_body.translation().y);
+    }
+}
+
 fn main() {
+    let physics = PhysicsWorld::new(Vector::new(0.0, -9.81, 0.0));
+    let global_app_state = AppState::new(physics);
+
+    std::thread::spawn(move || physics_thread(global_app_state));
     pollster::block_on(run());
 }

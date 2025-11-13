@@ -12,6 +12,7 @@ pub struct Builder<'a> {
 }
 
 impl<'a> Builder<'a> {
+    
     pub fn new(device: &'a wgpu::Device) -> Self {
         Builder {
             shader_filename: "dummy".to_string(),
@@ -37,22 +38,20 @@ impl<'a> Builder<'a> {
         self.bind_group_layouts.push(layout);
     }
 
-    pub fn set_shader_module(
-        &mut self,
-        shader_filename: &str,
-        vertex_entry: &str,
-        fragment_entry: &str,
-    ) {
+    pub fn set_shader_module(&mut self, shader_filename: &str, vertex_entry: &str, fragment_entry: &str) {
+
         self.shader_filename = shader_filename.to_string();
         self.vertex_entry = vertex_entry.to_string();
         self.fragment_entry = fragment_entry.to_string();
     }
 
     pub fn set_pixel_format(&mut self, pixel_format: wgpu::TextureFormat) {
+
         self.pixel_format = pixel_format;
     }
 
     pub fn build(&mut self, label: &str) -> wgpu::RenderPipeline {
+
         let mut filepath = current_dir().unwrap();
         filepath.push("src/");
         filepath.push(self.shader_filename.as_str());
@@ -70,9 +69,7 @@ impl<'a> Builder<'a> {
             bind_group_layouts: &self.bind_group_layouts,
             push_constant_ranges: &[],
         };
-        let pipeline_layout: wgpu::PipelineLayout = self
-            .device
-            .create_pipeline_layout(&pipeline_layout_descriptor);
+        let pipeline_layout: wgpu::PipelineLayout = self.device.create_pipeline_layout(&pipeline_layout_descriptor);
 
         let render_targets = [Some(wgpu::ColorTargetState {
             format: self.pixel_format,
@@ -80,9 +77,19 @@ impl<'a> Builder<'a> {
             write_mask: wgpu::ColorWrites::ALL,
         })];
 
+        let depth_stencil = wgpu::DepthStencilState {
+            format: wgpu::TextureFormat::Depth32Float,
+            depth_write_enabled: true,
+            depth_compare: wgpu::CompareFunction::Less,
+            stencil: wgpu::StencilState::default(),
+            bias: wgpu::DepthBiasState::default(),
+        };
+
         let render_pipeline_descriptor = wgpu::RenderPipelineDescriptor {
             label: Some(label),
             layout: Some(&pipeline_layout),
+
+            cache: None,
 
             vertex: wgpu::VertexState {
                 module: &shader_module,
@@ -108,19 +115,16 @@ impl<'a> Builder<'a> {
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             }),
 
-            depth_stencil: None,
+            depth_stencil: Some(depth_stencil),
             multisample: wgpu::MultisampleState {
                 count: 1,
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
-            multiview: None,
-            cache: None,
+            multiview: None
         };
 
-        let pipeline = self
-            .device
-            .create_render_pipeline(&render_pipeline_descriptor);
+        let pipeline = self.device.create_render_pipeline(&render_pipeline_descriptor);
 
         self.reset();
 
