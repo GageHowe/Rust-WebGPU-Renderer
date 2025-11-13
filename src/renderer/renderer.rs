@@ -8,7 +8,7 @@ use crate::renderer::backend::{
     ubo::{UBO, UBOGroup},
 };
 use glfw::Window;
-use glm::{dot, ext, radians};
+use glm::*;
 use std::collections::HashMap;
 
 use super::backend::definitions::{BindScope, Material, ModelVertex, PipelineType};
@@ -20,13 +20,14 @@ pub struct State<'a> {
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     pub size: (i32, i32),
+    /// struct that wraps a *GLFWWindow handle
     pub window: &'a mut Window,
     render_pipelines: HashMap<PipelineType, wgpu::RenderPipeline>,
     triangle_mesh: wgpu::Buffer,
     quad_mesh: Mesh,
     triangle_material: wgpu::BindGroup,
     quad_material: wgpu::BindGroup,
-    ubo: Option<UBOGroup>,
+    pub ubo: Option<UBOGroup>,
     projection_ubo: UBO,
     bind_group_layouts: HashMap<BindScope, wgpu::BindGroupLayout>,
     models: Vec<Model>,
@@ -90,15 +91,17 @@ impl<'a> State<'a> {
 
         let render_pipelines = Self::build_pipelines(&device, &config, &bind_group_layouts);
 
+        // hardcoded bs
+
         let triangle_material = new_texture(
-            "../img/winry.jpg",
+            "assets/companion_cube/companion_cube.png",
             &device,
             &queue,
             "Triangle Material",
             &bind_group_layouts[&BindScope::Texture],
         );
         let quad_material = new_texture(
-            "../img/satin.jpg",
+            "assets/rust.jpg",
             &device,
             &queue,
             "Quad Material",
@@ -197,21 +200,18 @@ impl<'a> State<'a> {
         pipelines
     }
 
-    pub fn load_assets(&mut self) {
+    pub fn load_assets(&mut self, filepath: &str) {
         let mut loader = ObjLoader::new();
 
-        let c0 = glm::Vec4::new(5.0, 0.0, 0.0, 0.0);
-        let c1 = glm::Vec4::new(0.0, 5.0, 0.0, 0.0);
-        let c2 = glm::Vec4::new(0.0, 0.0, 5.0, 0.0);
+        // goofy identity matrix
+        let c0 = glm::Vec4::new(1.0, 0.0, 0.0, 0.0);
+        let c1 = glm::Vec4::new(0.0, 1.0, 0.0, 0.0);
+        let c2 = glm::Vec4::new(0.0, 0.0, 1.0, 0.0);
         let c3 = glm::Vec4::new(0.0, 0.0, 0.0, 1.0);
         let pre_transform = glm::Matrix4::new(c0, c1, c2, c3);
 
-        self.models.push(loader.load(
-            "poses.obj",
-            &mut self.materials,
-            &self.device,
-            &pre_transform,
-        ));
+        self.models
+            .push(loader.load(filepath, &mut self.materials, &self.device, &pre_transform));
 
         for material in &mut self.materials {
             material.bind_group = match material.pipeline_type {
@@ -243,7 +243,6 @@ impl<'a> State<'a> {
             self.surface.configure(&self.device, &self.config);
 
             self.depth_buffer.texture.destroy();
-
             self.depth_buffer = new_depth_texture(&self.device, &self.config, "Depth Buffer");
         }
     }
@@ -273,10 +272,10 @@ impl<'a> State<'a> {
         let c3 = glm::Vec4::new(a, b, c, 1.0);
         let view = glm::Matrix4::new(c0, c1, c2, c3);
 
-        let fov_y: f32 = radians(45.0);
+        let fov_y: f32 = radians(80.0);
         let aspect = 4.0 / 3.0;
-        let z_near = 0.1;
-        let z_far = 100.0;
+        let z_near = 0.5;
+        let z_far = 1000.0;
         let projection = ext::perspective(fov_y, aspect, z_near, z_far);
 
         let view_proj = projection * view;
@@ -330,9 +329,11 @@ impl<'a> State<'a> {
         //renderpass.set_bind_group(2, &self.projection_ubo.bind_group, &[]);
 
         for submesh in &model.submeshes {
-            //let submesh = &model.submeshes[1];
-
-            //println!("index count: {}, first index: {}", submesh.index_count, submesh.first_index);
+            // let _submesh = &model.submeshes[1];
+            // println!(
+            //     "index count: {}, first index: {}",
+            //     submesh.index_count, submesh.first_index
+            // );
 
             // Select pipeline
             let material = &self.materials[submesh.material_id];

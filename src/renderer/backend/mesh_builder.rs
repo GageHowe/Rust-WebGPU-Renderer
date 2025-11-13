@@ -1,20 +1,18 @@
+use crate::renderer::backend::definitions::{Mesh, Model, PipelineType, Submesh, Vertex};
+use crate::utility::string::split;
 use glm::*;
-use wgpu::util::DeviceExt;
-use crate::renderer::backend::definitions::{Vertex, Mesh, PipelineType, Model, Submesh};
+use std::collections::HashMap;
 use std::env::current_dir;
 use std::fs;
-use crate::utility::string::split;
-use std::collections::HashMap;
+use std::path::Path;
+use wgpu::util::DeviceExt;
 
-use super::definitions::{ModelVertex, Material};
+use super::definitions::{Material, ModelVertex};
 
 // From: https://stackoverflow.com/questions/28127165/how-to-convert-struct-to-u8
 pub unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
     unsafe {
-        ::core::slice::from_raw_parts(
-            (p as *const T) as *const u8,
-            ::core::mem::size_of::<T>(),
-        )
+        ::core::slice::from_raw_parts((p as *const T) as *const u8, ::core::mem::size_of::<T>())
     }
 }
 
@@ -28,32 +26,51 @@ pub unsafe fn vec_to_u8_slice<T: Sized>(p: &Vec<T>) -> &[u8] {
 }
 
 pub fn make_triangle(device: &wgpu::Device) -> wgpu::Buffer {
-    
     let vertices: [Vertex; 3] = [
-        Vertex {position: Vec3::new(-0.75, -0.75, 0.0), color: Vec3::new(1.0, 0.0, 0.0)},
-        Vertex {position: Vec3::new( 0.75, -0.75, 0.0), color: Vec3::new(0.0, 1.0, 0.0)},
-        Vertex {position: Vec3::new(  0.0,  0.75, 0.0), color: Vec3::new(0.0, 0.0, 1.0)}
+        Vertex {
+            position: Vec3::new(-0.75, -0.75, 0.0),
+            color: Vec3::new(1.0, 0.0, 0.0),
+        },
+        Vertex {
+            position: Vec3::new(0.75, -0.75, 0.0),
+            color: Vec3::new(0.0, 1.0, 0.0),
+        },
+        Vertex {
+            position: Vec3::new(0.0, 0.75, 0.0),
+            color: Vec3::new(0.0, 0.0, 1.0),
+        },
     ];
     let bytes: &[u8] = unsafe { any_as_u8_slice(&vertices) };
 
-    let buffer_descriptor = wgpu::util::BufferInitDescriptor { 
-        label: Some("Triangle vertex buffer"), 
+    let buffer_descriptor = wgpu::util::BufferInitDescriptor {
+        label: Some("Triangle vertex buffer"),
         contents: bytes,
-         usage: wgpu::BufferUsages::VERTEX };
+        usage: wgpu::BufferUsages::VERTEX,
+    };
 
     let vertex_buffer = device.create_buffer_init(&buffer_descriptor);
 
     return vertex_buffer;
-    
 }
 
 pub fn make_quad(device: &wgpu::Device) -> Mesh {
-    
     let vertices: [Vertex; 4] = [
-        Vertex {position: Vec3::new(-0.75, -0.75, 0.0), color: Vec3::new(1.0, 0.0, 0.0)},
-        Vertex {position: Vec3::new( 0.75, -0.75, 0.0), color: Vec3::new(0.0, 1.0, 0.0)},
-        Vertex {position: Vec3::new( 0.75,  0.75, 0.0), color: Vec3::new(0.0, 0.0, 1.0)},
-        Vertex {position: Vec3::new(-0.75,  0.75, 0.0), color: Vec3::new(0.0, 1.0, 1.0)}
+        Vertex {
+            position: Vec3::new(-0.75, -0.75, 0.0),
+            color: Vec3::new(1.0, 0.0, 0.0),
+        },
+        Vertex {
+            position: Vec3::new(0.75, -0.75, 0.0),
+            color: Vec3::new(0.0, 1.0, 0.0),
+        },
+        Vertex {
+            position: Vec3::new(0.75, 0.75, 0.0),
+            color: Vec3::new(0.0, 0.0, 1.0),
+        },
+        Vertex {
+            position: Vec3::new(-0.75, 0.75, 0.0),
+            color: Vec3::new(0.0, 1.0, 1.0),
+        },
     ];
     let indices: [u16; 6] = [0, 1, 2, 2, 3, 0];
 
@@ -61,16 +78,16 @@ pub fn make_quad(device: &wgpu::Device) -> Mesh {
     let bytes_2: &[u8] = unsafe { any_as_u8_slice(&indices) };
     let bytes_merged: &[u8] = &[bytes_1, bytes_2].concat();
 
-    let buffer_descriptor = wgpu::util::BufferInitDescriptor { 
-        label: Some("Quad vertex & index buffer"), 
+    let buffer_descriptor = wgpu::util::BufferInitDescriptor {
+        label: Some("Quad vertex & index buffer"),
         contents: bytes_merged,
-        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::INDEX };
+        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::INDEX,
+    };
 
     let buffer = device.create_buffer_init(&buffer_descriptor);
     let offset: u64 = bytes_1.len().try_into().unwrap();
 
     Mesh { buffer, offset }
-    
 }
 
 pub struct ObjLoader {
@@ -86,9 +103,8 @@ pub struct ObjLoader {
 }
 
 impl ObjLoader {
-
     pub fn new() -> Self {
-        ObjLoader { 
+        ObjLoader {
             v: Vec::new(),
             vn: Vec::new(),
             vt: Vec::new(),
@@ -97,15 +113,15 @@ impl ObjLoader {
             history: HashMap::new(),
             recording: false,
             material_lookup: HashMap::new(),
-            current_submesh: Submesh { 
-                first_index: 0, 
-                index_count: 0, 
-                material_id: 0 }
+            current_submesh: Submesh {
+                first_index: 0,
+                index_count: 0,
+                material_id: 0,
+            },
         }
     }
 
     fn reset(&mut self) {
-
         self.v.clear();
         self.vn.clear();
         self.vt.clear();
@@ -114,35 +130,40 @@ impl ObjLoader {
         self.history.clear();
         self.recording = false;
         self.material_lookup.clear();
-        self.current_submesh = Submesh { 
-            first_index: 0, 
-            index_count: 0, 
-            material_id: 0 };
+        self.current_submesh = Submesh {
+            first_index: 0,
+            index_count: 0,
+            material_id: 0,
+        };
     }
 
-    pub fn load(&mut self, 
-        filename: &str, 
-        materials: &mut Vec<Material>, 
-        device: &wgpu::Device, pre_transform: &Mat4) -> Model {
-
+    pub fn load(
+        &mut self,
+        filename: &str,
+        materials: &mut Vec<Material>,
+        device: &wgpu::Device,
+        pre_transform: &Mat4,
+    ) -> Model {
         self.parse_materials(filename, materials);
         self.load_obj(device, filename, pre_transform)
     }
 
     fn parse_materials(&mut self, filename: &str, materials: &mut Vec<Material>) {
-        let mut full_filepath = current_dir().unwrap();
-        full_filepath.push("models/");
-        full_filepath.push(filename);
+        let mut full_filepath = current_dir().unwrap().join(filename);
         let mut filepath_str = full_filepath.into_os_string().into_string().unwrap();
 
-        let full_contents = fs::read_to_string(filepath_str)
-            .expect("Can't read model file!");
+        #[cfg(debug_assertions)]
+        println!(
+            "parse_materials attempting to read filepath: {} (1)",
+            filepath_str
+        );
+
+        let full_contents = fs::read_to_string(filepath_str).expect("Can't read model file!");
         let mut token: &str = "\n";
 
         let lines = split(&full_contents, token);
         token = " ";
 
-        
         let mut mtl_filename: String = "default.mtl".to_string();
         for line in lines {
             let words = split(&line, token);
@@ -153,19 +174,29 @@ impl ObjLoader {
             }
         }
 
-        full_filepath = current_dir().unwrap();
-        full_filepath.push("models/");
-        full_filepath.push(mtl_filename);
-        filepath_str = full_filepath.into_os_string().into_string().unwrap();
+        // full_filepath = current_dir().unwrap();
+        // full_filepath.push(mtl_filename);
+        // filepath_str = full_filepath.into_os_string().into_string().unwrap();
+        let obj_dir = Path::new(filename).parent().unwrap_or(Path::new("")); // get parent dir of the OBJ file
+        full_filepath = obj_dir.join(&mtl_filename); // join with the found .mtl filename
+        filepath_str = full_filepath
+            .clone()
+            .into_os_string()
+            .into_string()
+            .unwrap();
 
-        let full_contents = fs::read_to_string(filepath_str)
-            .expect("Can't read material file!");
+        #[cfg(debug_assertions)]
+        println!(
+            "parse_materials attempting to read filepath: {} (2)",
+            filepath_str
+        );
+
+        let full_contents = fs::read_to_string(filepath_str).expect("ERR");
         token = "\n";
 
         let lines = split(&full_contents, token);
         token = " ";
 
-        
         let mut has_texture: bool = false;
         let mut name: String = "none".to_string();
         let mut recording: bool = false;
@@ -176,16 +207,13 @@ impl ObjLoader {
             match words[0].as_str() {
                 "newmtl" => {
                     if recording {
-                        
                         if has_texture {
                             println!("Material {} is textured", name);
-                        }
-                        else {
+                        } else {
                             println!("Material {} is colored", name);
                         }
-                        
-                        self.material_lookup.insert(
-                            name, materials.len());
+
+                        self.material_lookup.insert(name, materials.len());
                         materials.push(material);
                     }
                     material = Material::new();
@@ -195,7 +223,10 @@ impl ObjLoader {
                 "map_Kd" => {
                     has_texture = true;
                     material.pipeline_type = PipelineType::TexturedModel;
-                    material.filename = Some(words[1].clone());
+                    // material.filename = Some(words[1].clone());
+                    let mtl_dir = full_filepath.parent().unwrap_or(Path::new(""));
+                    let tex_path = mtl_dir.join(&words[1]);
+                    material.filename = Some(tex_path.to_string_lossy().to_string());
                 }
                 "Kd" => {
                     has_texture = false;
@@ -206,36 +237,33 @@ impl ObjLoader {
                     let a: f32 = 1.0;
                     material.color = Some(Vec4::new(r, g, b, a));
                 }
-                _ => {
-
-                }
+                _ => {}
             }
         }
-        
+
         if has_texture {
             println!("Material {} is textured", name);
-        }
-        else {
+        } else {
             println!("Material {} is colored", name);
         }
-        
-        self.material_lookup.insert(
-            name, materials.len());
+
+        self.material_lookup.insert(name, materials.len());
         materials.push(material);
     }
 
-    fn load_obj(&mut self, device: &wgpu::Device, filename: &str, pre_transform: &Mat4) -> Model{
-
+    fn load_obj(&mut self, device: &wgpu::Device, filename: &str, pre_transform: &Mat4) -> Model {
         let mut submeshes: Vec<Submesh> = Vec::new();
         self.recording = false;
 
         let mut full_filepath = current_dir().unwrap();
-        full_filepath.push("models/");
+        // full_filepath.push("");
         full_filepath.push(filename);
         let filepath_str = full_filepath.into_os_string().into_string().unwrap();
 
-        let full_contents = fs::read_to_string(filepath_str)
-            .expect("Can't read model file!");
+        #[cfg(debug_assertions)]
+        println!("load_obj attempting to read filepath: {}", filepath_str);
+
+        let full_contents = fs::read_to_string(filepath_str).expect("Can't read model file!");
         let mut token: &str = "\n";
 
         let lines = split(&full_contents, token);
@@ -304,13 +332,12 @@ impl ObjLoader {
     }
 
     fn start_new_submesh(&mut self, words: &Vec<String>, submeshes: &mut Vec<Submesh>) {
-
         //println!("New submesh: {}", words[1]);
-        
+
         if self.recording {
             submeshes.push(self.current_submesh);
-            self.current_submesh.first_index = self.current_submesh.first_index 
-                                        + self.current_submesh.index_count as i32;
+            self.current_submesh.first_index =
+                self.current_submesh.first_index + self.current_submesh.index_count as i32;
             self.current_submesh.index_count = 0;
         }
 
@@ -319,10 +346,9 @@ impl ObjLoader {
     }
 
     fn read_f(&mut self, words: &Vec<String>) {
-        
         let triangle_count = words.len() - 3;
 
-        for i in 0 .. triangle_count {
+        for i in 0..triangle_count {
             self.read_vertex(words[1].clone());
             self.read_vertex(words[i + 2].clone());
             self.read_vertex(words[i + 3].clone());
@@ -330,7 +356,6 @@ impl ObjLoader {
     }
 
     fn read_vertex(&mut self, bundle: String) {
-
         /*
         // This fails for some reason
         if !self.history.contains_key(&bundle) {
@@ -341,8 +366,8 @@ impl ObjLoader {
             let k: usize = v_vt_vn[2].parse::<usize>().unwrap() - 1;
 
             self.vertex_data.push(ModelVertex {
-                position: self.v[i], 
-                tex_coord: self.vt[j], 
+                position: self.v[i],
+                tex_coord: self.vt[j],
                 normal: self.vn[k]});
         }
         self.index_data.push(self.history[&bundle]);
@@ -358,30 +383,38 @@ impl ObjLoader {
         self.index_data.push(self.vertex_data.len() as u32);
 
         self.vertex_data.push(ModelVertex {
-            position: self.v[i], 
-            tex_coord: self.vt[j], 
-            normal: self.vn[k]});
+            position: self.v[i],
+            tex_coord: self.vt[j],
+            normal: self.vn[k],
+        });
         self.current_submesh.index_count = self.current_submesh.index_count + 1;
     }
 
     fn finalize(&mut self, device: &wgpu::Device) -> Model {
-
-        println!("vertex count: {}, index count: {}", self.vertex_data.len(), self.index_data.len());
+        println!(
+            "vertex count: {}, index count: {}",
+            self.vertex_data.len(),
+            self.index_data.len()
+        );
         let bytes_1: &[u8] = unsafe { vec_to_u8_slice(&self.vertex_data) };
         let bytes_2: &[u8] = unsafe { vec_to_u8_slice(&self.index_data) };
         let bytes_merged: &[u8] = &[bytes_1, bytes_2].concat();
 
-        let buffer_descriptor = wgpu::util::BufferInitDescriptor { 
-            label: Some("Model vertex & index buffer"), 
+        let buffer_descriptor = wgpu::util::BufferInitDescriptor {
+            label: Some("Model vertex & index buffer"),
             contents: bytes_merged,
-            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::INDEX };
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::INDEX,
+        };
 
         let buffer = device.create_buffer_init(&buffer_descriptor);
         let ebo_offset: u64 = bytes_1.len().try_into().unwrap();
         println!("ebo offset: {}", ebo_offset);
         let submeshes = Vec::new();
 
-        Model { buffer, ebo_offset, submeshes }
+        Model {
+            buffer,
+            ebo_offset,
+            submeshes,
+        }
     }
-
 }

@@ -34,6 +34,7 @@ impl Camera {
         }
     }
 
+    // TODO: make a version that respects 6dof
     pub fn spin(&mut self, d_yaw: f32, d_pitch: f32) {
         self.yaw = self.yaw + d_yaw;
         if self.yaw > 360.0 {
@@ -61,11 +62,5 @@ impl Camera {
         self.right = normalize(cross(self.forwards, self.up));
 
         self.up = normalize(cross(self.right, self.forwards));
-    }
-
-    pub fn walk(&mut self, d_right: f32, d_forwards: f32) {
-        let z: f32 = self.position.z;
-        self.position = self.position + self.right * d_right + self.forwards * d_forwards;
-        self.position.z = z;
     }
 }

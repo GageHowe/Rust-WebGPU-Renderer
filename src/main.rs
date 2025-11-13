@@ -4,10 +4,10 @@ use std::sync::Mutex;
 
 use glfw::{Action, ClientApiHint, Key, WindowHint, fail_on_errors};
 mod renderer;
+use glm::Vector3;
 use renderer::renderer::State;
 mod model;
 use model::{game_objects::Object, world::World};
-mod engine;
 mod physics;
 mod utility;
 use crate::physics::physics::PhysicsWorld;
@@ -45,7 +45,7 @@ async fn run() {
     state.window.set_pos_polling(true);
     state.window.set_cursor_mode(glfw::CursorMode::Hidden);
 
-    state.load_assets();
+    state.load_assets("assets/companion_cube/companion_cube.obj");
 
     // Build world
     let mut world = World::new();
@@ -70,8 +70,20 @@ async fn run() {
                 glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
                     state.window.set_should_close(true)
                 }
+                glfw::WindowEvent::Key(Key::E, _, Action::Press, _) => {
+                    world.tris.push(Object {
+                        position: Vector3::new(0.0, 2.0, 3.0),
+                        angle: 0.0,
+                    });
 
-                // press or release any key
+                    let total = world.tris.len() + world.quads.len(); // Adjust if using quads as well
+                    let capacity = state.ubo.as_ref().unwrap().bind_groups.len();
+                    if total > capacity {
+                        state.build_ubos_for_objects(total);
+                    }
+                }
+
+                // fall back to world implementations
                 glfw::WindowEvent::Key(key, _, Action::Press, _) => {
                     world.set_key(key, true);
                 }
@@ -79,6 +91,16 @@ async fn run() {
                     world.keys.insert(key, false);
                 }
 
+                /*world.tris.push(new_object);
+                let true_count = world.tris.len(); // Or all objects if using a unified list
+
+                if true_count > state.ubo.as_ref().unwrap().bind_groups.len() {
+                    state.ubo = Some(UBOGroup::new(&state.device, true_count, &state.bind_group_layouts[&BindScope::UBO]));
+                }
+
+                // On each frame:
+                state.ubo.as_mut().unwrap().upload(i as u64, &world.tris[i].calc_matrix(), &state.queue);
+                 */
                 // window moved
                 glfw::WindowEvent::Pos(..) => {
                     state.update_surface();
@@ -140,9 +162,9 @@ fn physics_thread(appstate: AppState) {
 }
 
 fn main() {
-    let physics = PhysicsWorld::new(Vector::new(0.0, -9.81, 0.0));
-    let global_app_state = AppState::new(physics);
+    // let physics = PhysicsWorld::new(Vector::new(0.0, -9.81, 0.0));
+    // let global_app_state = AppState::new(physics);
 
-    std::thread::spawn(move || physics_thread(global_app_state));
+    // std::thread::spawn(move || physics_thread(global_app_state));
     pollster::block_on(run());
 }

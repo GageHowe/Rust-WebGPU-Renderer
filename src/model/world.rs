@@ -6,7 +6,6 @@ pub struct World {
     pub quads: Vec<Object>,
     pub tris: Vec<Object>,
     pub camera: Camera,
-    /// idk what this is
     pub keys: HashMap<glfw::Key, bool>,
 }
 
@@ -23,6 +22,8 @@ impl World {
         world.keys.insert(glfw::Key::A, false);
         world.keys.insert(glfw::Key::S, false);
         world.keys.insert(glfw::Key::D, false);
+        world.keys.insert(glfw::Key::Space, false);
+        world.keys.insert(glfw::Key::LeftControl, false);
 
         world
     }
@@ -59,6 +60,9 @@ impl World {
         if self.keys[&glfw::Key::D] {
             d_right = d_right + 0.1;
         }
-        self.camera.walk(d_right, d_forwards);
+
+        // fly
+        self.camera.position =
+            self.camera.position + self.camera.right * d_right + self.camera.forwards * d_forwards;
     }
 }

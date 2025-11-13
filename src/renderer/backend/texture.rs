@@ -1,5 +1,5 @@
-use std::env::current_dir;
 use crate::renderer::backend::mesh_builder::any_as_u8_slice;
+use std::env::current_dir;
 use wgpu::util::DeviceExt;
 
 use glm::Vec4;
@@ -11,10 +11,11 @@ pub struct Texture {
     pub view: wgpu::TextureView,
 }
 
-    
-pub fn new_depth_texture(device: &wgpu::Device, 
-    config: &wgpu::SurfaceConfiguration, label: &str) -> Texture {
-
+pub fn new_depth_texture(
+    device: &wgpu::Device,
+    config: &wgpu::SurfaceConfiguration,
+    label: &str,
+) -> Texture {
     let size = wgpu::Extent3d {
         width: config.width.max(1),
         height: config.height.max(1),
@@ -38,15 +39,21 @@ pub fn new_depth_texture(device: &wgpu::Device,
     Texture { texture, view }
 }
 
-pub fn new_texture(filename: &str, device: &wgpu::Device, 
-    queue: &wgpu::Queue, label: &str, 
-    layout: &wgpu::BindGroupLayout) -> wgpu::BindGroup {
-
+pub fn new_texture(
+    filename: &str,
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    label: &str,
+    layout: &wgpu::BindGroupLayout,
+) -> wgpu::BindGroup {
     // Get absolute filepath from relative one
     let mut filepath = current_dir().unwrap();
-    filepath.push("src/");
+    // filepath.push("src/");
     filepath.push(filename);
     let filepath = filepath.into_os_string().into_string().unwrap();
+
+    #[cfg(debug_assertions)]
+    println!("new_texture attempting to read filepath: {}", filepath);
 
     let bytes = std::fs::read(filepath).unwrap();
     let loaded_image = image::load_from_memory(&bytes).unwrap();
@@ -56,8 +63,9 @@ pub fn new_texture(filename: &str, device: &wgpu::Device,
     let texture_size = wgpu::Extent3d {
         width: size.0,
         height: size.1,
-        depth_or_array_layers: 1};
-    
+        depth_or_array_layers: 1,
+    };
+
     // Create the texture
     let texture_descriptor = wgpu::TextureDescriptor {
         size: texture_size,
@@ -67,7 +75,8 @@ pub fn new_texture(filename: &str, device: &wgpu::Device,
         format: wgpu::TextureFormat::Rgba8Unorm,
         usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
         label: Some(label),
-        view_formats: &[wgpu::TextureFormat::Rgba8Unorm,]};
+        view_formats: &[wgpu::TextureFormat::Rgba8Unorm],
+    };
     let texture = device.create_texture(&texture_descriptor);
 
     // Upload to it
@@ -84,8 +93,9 @@ pub fn new_texture(filename: &str, device: &wgpu::Device,
             bytes_per_row: Some(4 * size.0),
             rows_per_image: Some(size.1),
         },
-        texture_size);
-    
+        texture_size,
+    );
+
     // Get a view of the texture
     let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
@@ -108,18 +118,21 @@ pub fn new_texture(filename: &str, device: &wgpu::Device,
     let bind_group = builder.build(label);
 
     bind_group
-    
 }
 
-pub fn new_color(color: &Vec4, device: &wgpu::Device, 
-    label: &str, layout: &wgpu::BindGroupLayout) -> wgpu::BindGroup {
-
+pub fn new_color(
+    color: &Vec4,
+    device: &wgpu::Device,
+    label: &str,
+    layout: &wgpu::BindGroupLayout,
+) -> wgpu::BindGroup {
     let bytes: &[u8] = unsafe { any_as_u8_slice(color) };
 
-    let buffer_descriptor = wgpu::util::BufferInitDescriptor { 
-        label: Some("Model vertex & index buffer"), 
+    let buffer_descriptor = wgpu::util::BufferInitDescriptor {
+        label: Some("Model vertex & index buffer"),
         contents: bytes,
-        usage: wgpu::BufferUsages::UNIFORM };
+        usage: wgpu::BufferUsages::UNIFORM,
+    };
 
     let buffer = device.create_buffer_init(&buffer_descriptor);
 

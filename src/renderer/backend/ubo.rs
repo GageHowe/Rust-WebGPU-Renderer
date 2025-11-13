@@ -1,19 +1,21 @@
 use super::bind_group;
 use super::mesh_builder::any_as_u8_slice;
 
+/// for managing multiple uniforms (matrices) in one large buffer with proper alignment and per-object bind groups, useful when you have many objects.
 pub struct UBOGroup {
     pub buffer: wgpu::Buffer,
+    /// A vector of wgpu::BindGroup, each representing a bind group used to bind a slice of the buffer to a shader.
     pub bind_groups: Vec<wgpu::BindGroup>,
-    allignment: u64,
+    /// The required alignment size for the buffer offset to ensure hardware/GPU compatibility.
+    alignment: u64,
 }
 
 impl UBOGroup {
-
     pub fn new(device: &wgpu::Device, object_count: usize, layout: &wgpu::BindGroupLayout) -> Self {
-
         let allignment = glm::max(
-            device.limits().min_storage_buffer_offset_alignment as u32, 
-            std::mem::size_of::<glm::Mat4>() as u32) as u64;
+            device.limits().min_storage_buffer_offset_alignment as u32,
+            std::mem::size_of::<glm::Mat4>() as u32,
+        ) as u64;
 
         let buffer_descriptor = wgpu::BufferDescriptor {
             label: Some("UBO"),
@@ -32,26 +34,28 @@ impl UBOGroup {
             bind_groups.push(builder.build("Matrix"));
         }
 
-        Self { buffer, bind_groups, allignment }
+        Self {
+            buffer,
+            bind_groups,
+            alignment: allignment,
+        }
     }
 
     pub fn upload(&mut self, i: u64, matrix: &glm::Mat4, queue: &wgpu::Queue) {
-        let offset = i * self.allignment;
+        let offset = i * self.alignment;
         let data: &[u8] = unsafe { any_as_u8_slice(matrix) };
         queue.write_buffer(&self.buffer, offset, data);
-        
     }
 }
 
+/// Uniform Buffer Object - used for efficiently sending data to shaders
 pub struct UBO {
     pub buffer: wgpu::Buffer,
     pub bind_group: wgpu::BindGroup,
 }
 
 impl UBO {
-
     pub fn new(device: &wgpu::Device, layout: &wgpu::BindGroupLayout) -> Self {
-
         let buffer_descriptor = wgpu::BufferDescriptor {
             label: Some("UBO"),
             size: std::mem::size_of::<glm::Mat4>() as u64,
@@ -76,6 +80,5 @@ impl UBO {
         let offset = 0;
         let data: &[u8] = unsafe { any_as_u8_slice(matrix) };
         queue.write_buffer(&self.buffer, offset, data);
-        
     }
 }
