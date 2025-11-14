@@ -14,7 +14,9 @@ use std::collections::HashMap;
 use super::backend::definitions::{BindScope, Material, ModelVertex, PipelineType};
 
 pub struct State<'a> {
+    /// a handle to our GPU
     instance: wgpu::Instance,
+    /// the part of the window that we draw to
     surface: wgpu::Surface<'a>,
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -63,7 +65,6 @@ impl<'a> State<'a> {
             experimental_features: wgpu::ExperimentalFeatures::default(),
         };
         let (device, queue) = adapter.request_device(&device_descriptor).await.unwrap();
-
         let surface_capabilities = surface.get_capabilities(&adapter);
         let surface_format = surface_capabilities
             .formats
