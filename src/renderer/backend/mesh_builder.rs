@@ -25,70 +25,70 @@ pub unsafe fn vec_to_u8_slice<T: Sized>(p: &Vec<T>) -> &[u8] {
     }
 }
 
-pub fn make_triangle(device: &wgpu::Device) -> wgpu::Buffer {
-    let vertices: [Vertex; 3] = [
-        Vertex {
-            position: Vec3::new(-0.75, -0.75, 0.0),
-            color: Vec3::new(1.0, 0.0, 0.0),
-        },
-        Vertex {
-            position: Vec3::new(0.75, -0.75, 0.0),
-            color: Vec3::new(0.0, 1.0, 0.0),
-        },
-        Vertex {
-            position: Vec3::new(0.0, 0.75, 0.0),
-            color: Vec3::new(0.0, 0.0, 1.0),
-        },
-    ];
-    let bytes: &[u8] = unsafe { any_as_u8_slice(&vertices) };
+// pub fn make_triangle(device: &wgpu::Device) -> wgpu::Buffer {
+//     let vertices: [Vertex; 3] = [
+//         Vertex {
+//             position: Vec3::new(-0.75, -0.75, 0.0),
+//             color: Vec3::new(1.0, 0.0, 0.0),
+//         },
+//         Vertex {
+//             position: Vec3::new(0.75, -0.75, 0.0),
+//             color: Vec3::new(0.0, 1.0, 0.0),
+//         },
+//         Vertex {
+//             position: Vec3::new(0.0, 0.75, 0.0),
+//             color: Vec3::new(0.0, 0.0, 1.0),
+//         },
+//     ];
+//     let bytes: &[u8] = unsafe { any_as_u8_slice(&vertices) };
 
-    let buffer_descriptor = wgpu::util::BufferInitDescriptor {
-        label: Some("Triangle vertex buffer"),
-        contents: bytes,
-        usage: wgpu::BufferUsages::VERTEX,
-    };
+//     let buffer_descriptor = wgpu::util::BufferInitDescriptor {
+//         label: Some("Triangle vertex buffer"),
+//         contents: bytes,
+//         usage: wgpu::BufferUsages::VERTEX,
+//     };
 
-    let vertex_buffer = device.create_buffer_init(&buffer_descriptor);
+//     let vertex_buffer = device.create_buffer_init(&buffer_descriptor);
 
-    return vertex_buffer;
-}
+//     return vertex_buffer;
+// }
 
-pub fn make_quad(device: &wgpu::Device) -> Mesh {
-    let vertices: [Vertex; 4] = [
-        Vertex {
-            position: Vec3::new(-0.75, -0.75, 0.0),
-            color: Vec3::new(1.0, 0.0, 0.0),
-        },
-        Vertex {
-            position: Vec3::new(0.75, -0.75, 0.0),
-            color: Vec3::new(0.0, 1.0, 0.0),
-        },
-        Vertex {
-            position: Vec3::new(0.75, 0.75, 0.0),
-            color: Vec3::new(0.0, 0.0, 1.0),
-        },
-        Vertex {
-            position: Vec3::new(-0.75, 0.75, 0.0),
-            color: Vec3::new(0.0, 1.0, 1.0),
-        },
-    ];
-    let indices: [u16; 6] = [0, 1, 2, 2, 3, 0];
+// pub fn make_quad(device: &wgpu::Device) -> Mesh {
+//     let vertices: [Vertex; 4] = [
+//         Vertex {
+//             position: Vec3::new(-0.75, -0.75, 0.0),
+//             color: Vec3::new(1.0, 0.0, 0.0),
+//         },
+//         Vertex {
+//             position: Vec3::new(0.75, -0.75, 0.0),
+//             color: Vec3::new(0.0, 1.0, 0.0),
+//         },
+//         Vertex {
+//             position: Vec3::new(0.75, 0.75, 0.0),
+//             color: Vec3::new(0.0, 0.0, 1.0),
+//         },
+//         Vertex {
+//             position: Vec3::new(-0.75, 0.75, 0.0),
+//             color: Vec3::new(0.0, 1.0, 1.0),
+//         },
+//     ];
+//     let indices: [u16; 6] = [0, 1, 2, 2, 3, 0];
 
-    let bytes_1: &[u8] = unsafe { any_as_u8_slice(&vertices) };
-    let bytes_2: &[u8] = unsafe { any_as_u8_slice(&indices) };
-    let bytes_merged: &[u8] = &[bytes_1, bytes_2].concat();
+//     let bytes_1: &[u8] = unsafe { any_as_u8_slice(&vertices) };
+//     let bytes_2: &[u8] = unsafe { any_as_u8_slice(&indices) };
+//     let bytes_merged: &[u8] = &[bytes_1, bytes_2].concat();
 
-    let buffer_descriptor = wgpu::util::BufferInitDescriptor {
-        label: Some("Quad vertex & index buffer"),
-        contents: bytes_merged,
-        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::INDEX,
-    };
+//     let buffer_descriptor = wgpu::util::BufferInitDescriptor {
+//         label: Some("Quad vertex & index buffer"),
+//         contents: bytes_merged,
+//         usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::INDEX,
+//     };
 
-    let buffer = device.create_buffer_init(&buffer_descriptor);
-    let offset: u64 = bytes_1.len().try_into().unwrap();
+//     let buffer = device.create_buffer_init(&buffer_descriptor);
+//     let offset: u64 = bytes_1.len().try_into().unwrap();
 
-    Mesh { buffer, offset }
-}
+//     Mesh { buffer, offset }
+// }
 
 pub struct ObjLoader {
     v: Vec<Vec3>,
