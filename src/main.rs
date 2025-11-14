@@ -49,15 +49,7 @@ async fn run() {
 
     // Build world
     let mut world = World::new();
-    world.tris.push(Object {
-        position: glm::Vec3::new(0.0, 0.0, -1.0),
-        angle: 0.0,
-    });
-    world.quads.push(Object {
-        position: glm::Vec3::new(0.5, 0.0, -1.5),
-        angle: 0.0,
-    });
-    state.build_ubos_for_objects(2);
+    state.build_ubos_for_objects(1); // One instance for your one OBJ
 
     while !state.window.should_close() {
         glfw.poll_events();
@@ -70,18 +62,6 @@ async fn run() {
                 glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
                     state.window.set_should_close(true)
                 }
-                glfw::WindowEvent::Key(Key::E, _, Action::Press, _) => {
-                    world.tris.push(Object {
-                        position: Vector3::new(0.0, 2.0, 3.0),
-                        angle: 0.0,
-                    });
-
-                    let total = world.tris.len() + world.quads.len(); // Adjust if using quads as well
-                    let capacity = state.ubo.as_ref().unwrap().bind_groups.len();
-                    if total > capacity {
-                        state.build_ubos_for_objects(total);
-                    }
-                }
 
                 // fall back to world implementations
                 glfw::WindowEvent::Key(key, _, Action::Press, _) => {
@@ -91,16 +71,6 @@ async fn run() {
                     world.keys.insert(key, false);
                 }
 
-                /*world.tris.push(new_object);
-                let true_count = world.tris.len(); // Or all objects if using a unified list
-
-                if true_count > state.ubo.as_ref().unwrap().bind_groups.len() {
-                    state.ubo = Some(UBOGroup::new(&state.device, true_count, &state.bind_group_layouts[&BindScope::UBO]));
-                }
-
-                // On each frame:
-                state.ubo.as_mut().unwrap().upload(i as u64, &world.tris[i].calc_matrix(), &state.queue);
-                 */
                 // window moved
                 glfw::WindowEvent::Pos(..) => {
                     state.update_surface();
@@ -116,7 +86,7 @@ async fn run() {
             }
         }
 
-        match state.render(&world.quads, &world.tris, &world.camera) {
+        match state.render(&world.camera) {
             Ok(_) => {}
             Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
                 state.update_surface();

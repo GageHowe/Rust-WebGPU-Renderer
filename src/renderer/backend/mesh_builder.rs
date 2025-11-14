@@ -30,7 +30,8 @@ impl ObjLoader {
     ) -> Model {
         let obj_path = Path::new(filename);
 
-        let (models, materials) = tobj::load_obj(
+        let (models, materials) = 
+      ::load_obj(
             obj_path,
             &tobj::LoadOptions {
                 triangulate: true,
@@ -139,6 +140,7 @@ impl ObjLoader {
     }
 }
 
+
 pub fn make_triangle(device: &wgpu::Device) -> wgpu::Buffer {
     let vertices: [Vertex; 3] = [
         Vertex {
@@ -216,3 +218,5 @@ pub fn make_quad(device: &wgpu::Device) -> Mesh {
         offset: bytes_v.len() as u64,
     }
 }
+
+    

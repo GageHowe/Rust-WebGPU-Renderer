@@ -1,10 +1,8 @@
-use crate::model::game_objects::{Camera, Object};
+use crate::model::game_objects::Camera;
 use glfw::Window;
 use std::collections::HashMap;
 
 pub struct World {
-    pub quads: Vec<Object>,
-    pub tris: Vec<Object>,
     pub camera: Camera,
     pub keys: HashMap<glfw::Key, bool>,
 }
@@ -12,8 +10,6 @@ pub struct World {
 impl World {
     pub fn new() -> Self {
         let mut world = World {
-            quads: Vec::new(),
-            tris: Vec::new(),
             camera: Camera::new(),
             keys: HashMap::new(),
         };
@@ -32,13 +28,6 @@ impl World {
         self.keys.insert(key, state);
     }
     pub fn update(&mut self, dt: f32, window: &mut Window) {
-        for i in 0..self.tris.len() {
-            self.tris[i].angle = self.tris[i].angle + 0.001 * dt;
-            if self.tris[i].angle > 360.0 {
-                self.tris[i].angle -= 360.0;
-            }
-        }
-
         let mouse_pos = window.get_cursor_pos();
         window.set_cursor_pos(400.0, 300.0);
         let dx = (-40.0 * (mouse_pos.0 - 400.0) / 400.0) as f32;
