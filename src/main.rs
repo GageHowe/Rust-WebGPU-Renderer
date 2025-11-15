@@ -49,7 +49,14 @@ async fn run() {
 
     // Build world
     let mut world = World::new();
-    state.build_ubos_for_objects(1); // One instance for your one OBJ
+
+    // without this the objects fail to render???
+    world.tris.push(Object {
+        position: glm::Vec3::new(0.0, 0.0, 0.0),
+        angle: 0.0,
+    });
+
+    state.build_ubos_for_objects(1);
 
     while !state.window.should_close() {
         glfw.poll_events();
@@ -71,6 +78,16 @@ async fn run() {
                     world.keys.insert(key, false);
                 }
 
+                /*world.tris.push(new_object);
+                let true_count = world.tris.len(); // Or all objects if using a unified list
+
+                if true_count > state.ubo.as_ref().unwrap().bind_groups.len() {
+                    state.ubo = Some(UBOGroup::new(&state.device, true_count, &state.bind_group_layouts[&BindScope::UBO]));
+                }
+
+                // On each frame:
+                state.ubo.as_mut().unwrap().upload(i as u64, &world.tris[i].calc_matrix(), &state.queue);
+                 */
                 // window moved
                 glfw::WindowEvent::Pos(..) => {
                     state.update_surface();
@@ -86,7 +103,7 @@ async fn run() {
             }
         }
 
-        match state.render(&world.camera) {
+        match state.render(&world.tris, &world.camera) {
             Ok(_) => {}
             Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
                 state.update_surface();
