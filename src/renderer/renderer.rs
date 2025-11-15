@@ -25,10 +25,6 @@ pub struct State<'a> {
     /// struct that wraps a *GLFWWindow handle
     pub window: &'a mut Window,
     render_pipelines: HashMap<PipelineType, wgpu::RenderPipeline>,
-    triangle_mesh: wgpu::Buffer,
-    quad_mesh: Mesh,
-    triangle_material: wgpu::BindGroup,
-    quad_material: wgpu::BindGroup,
     pub ubo: Option<UBOGroup>,
     projection_ubo: UBO,
     bind_group_layouts: HashMap<BindScope, wgpu::BindGroupLayout>,
@@ -84,9 +80,9 @@ impl<'a> State<'a> {
         };
         surface.configure(&device, &config);
 
-        let triangle_buffer = mesh_builder::make_triangle(&device);
+        // let triangle_buffer = mesh_builder::make_triangle(&device);
 
-        let quad_mesh = mesh_builder::make_quad(&device);
+        // let quad_mesh = mesh_builder::make_quad(&device);
 
         let bind_group_layouts = Self::build_bind_group_layouts(&device);
 
@@ -122,10 +118,6 @@ impl<'a> State<'a> {
             config,
             size,
             render_pipelines,
-            triangle_mesh: triangle_buffer,
-            quad_mesh,
-            triangle_material: triangle_material,
-            quad_material: quad_material,
             ubo: None,
             projection_ubo: projection_ubo,
             bind_group_layouts: bind_group_layouts,
@@ -411,45 +403,12 @@ impl<'a> State<'a> {
         {
             let mut renderpass = command_encoder.begin_render_pass(&render_pass_descriptor);
             renderpass.set_pipeline(&self.render_pipelines[&PipelineType::Simple]);
-
-            // Quads
-            renderpass.set_bind_group(0, &self.quad_material, &[]);
             renderpass.set_bind_group(2, &self.projection_ubo.bind_group, &[]);
-            renderpass.set_vertex_buffer(0, self.quad_mesh.buffer.slice(0..self.quad_mesh.offset));
-            renderpass.set_index_buffer(
-                self.quad_mesh.buffer.slice(self.quad_mesh.offset..),
-                wgpu::IndexFormat::Uint16,
-            );
-            let mut offset: usize = 0;
-            for i in 0..quads.len() {
-                renderpass.set_bind_group(
-                    1,
-                    &(self.ubo.as_ref().unwrap()).bind_groups[offset + i],
-                    &[],
-                );
-                renderpass.draw_indexed(0..6, 0, 0..1);
-            }
 
-            // Triangles
-            renderpass.set_bind_group(0, &self.triangle_material, &[]);
-            renderpass.set_vertex_buffer(0, self.triangle_mesh.slice(..));
-            offset = quads.len();
-            for i in 0..tris.len() {
-                renderpass.set_bind_group(
-                    1,
-                    &(self.ubo.as_ref().unwrap()).bind_groups[offset + i],
-                    &[],
-                );
-                renderpass.draw(0..3, 0..1);
-            }
-
-            // Model
             self.render_model(&self.models[0], &mut renderpass);
         }
         self.queue.submit(std::iter::once(command_encoder.finish()));
-        // self.device.poll(wgpu::MaintainBase::wait()).ok();
         let _ = self.device.poll(wgpu::PollType::Wait {
-            // updated from deprecated Maintain
             submission_index: None,
             timeout: None,
         });

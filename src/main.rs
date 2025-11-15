@@ -70,18 +70,6 @@ async fn run() {
                 glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
                     state.window.set_should_close(true)
                 }
-                glfw::WindowEvent::Key(Key::E, _, Action::Press, _) => {
-                    world.tris.push(Object {
-                        position: Vector3::new(0.0, 2.0, 3.0),
-                        angle: 0.0,
-                    });
-
-                    let total = world.tris.len() + world.quads.len(); // Adjust if using quads as well
-                    let capacity = state.ubo.as_ref().unwrap().bind_groups.len();
-                    if total > capacity {
-                        state.build_ubos_for_objects(total);
-                    }
-                }
 
                 // fall back to world implementations
                 glfw::WindowEvent::Key(key, _, Action::Press, _) => {
