@@ -80,30 +80,9 @@ impl<'a> State<'a> {
         };
         surface.configure(&device, &config);
 
-        // let triangle_buffer = mesh_builder::make_triangle(&device);
-
-        // let quad_mesh = mesh_builder::make_quad(&device);
-
         let bind_group_layouts = Self::build_bind_group_layouts(&device);
 
         let render_pipelines = Self::build_pipelines(&device, &config, &bind_group_layouts);
-
-        // hardcoded bs
-
-        let triangle_material = new_texture(
-            "assets/companion_cube/companion_cube.png",
-            &device,
-            &queue,
-            "Triangle Material",
-            &bind_group_layouts[&BindScope::Texture],
-        );
-        let quad_material = new_texture(
-            "assets/rust.jpg",
-            &device,
-            &queue,
-            "Quad Material",
-            &bind_group_layouts[&BindScope::Texture],
-        );
 
         let projection_ubo = UBO::new(&device, &bind_group_layouts[&BindScope::UBO]);
 
@@ -309,6 +288,23 @@ impl<'a> State<'a> {
         }
     }
 
+    fn update_transforms_new(&mut self, objects: &Vec<Object>) {
+        for i in 0..objects.len() {
+            let c0 = glm::Vec4::new(1.0, 0.0, 0.0, 0.0);
+            let c1 = glm::Vec4::new(0.0, 1.0, 0.0, 0.0);
+            let c2 = glm::Vec4::new(0.0, 0.0, 1.0, 0.0);
+            let c3 = glm::Vec4::new(0.0, 0.0, 0.0, 1.0);
+            let m1 = glm::Matrix4::new(c0, c1, c2, c3);
+            let m2 = glm::Matrix4::new(c0, c1, c2, c3);
+            let matrix = ext::rotate(&m2, objects[i].angle, glm::Vector3::new(0.0, 0.0, 1.0))
+                * ext::translate(&m1, objects[i].position);
+            self.ubo
+                .as_mut()
+                .unwrap()
+                .upload(i as u64, &matrix, &self.queue);
+        }
+    }
+
     fn render_model(&self, model: &Model, renderpass: &mut wgpu::RenderPass) {
         // Bind vertex and index buffer
         renderpass.set_vertex_buffer(0, model.buffer.slice(0..model.ebo_offset));
@@ -322,24 +318,15 @@ impl<'a> State<'a> {
         //renderpass.set_bind_group(2, &self.projection_ubo.bind_group, &[]);
 
         for submesh in &model.submeshes {
-            // let _submesh = &model.submeshes[1];
-            // println!(
-            //     "index count: {}, first index: {}",
-            //     submesh.index_count, submesh.first_index
-            // );
-
-            // Select pipeline
             let material = &self.materials[submesh.material_id];
             renderpass.set_pipeline(&self.render_pipelines[&material.pipeline_type]);
             renderpass.set_bind_group(0, (material.bind_group).as_ref().unwrap(), &[]);
-
             renderpass.draw_indexed(0..submesh.index_count, submesh.first_index, 0..1);
         }
     }
 
     pub fn render(
         &mut self,
-        quads: &Vec<Object>,
         tris: &Vec<Object>,
         camera: &Camera,
     ) -> Result<(), wgpu::SurfaceError> {
@@ -349,12 +336,11 @@ impl<'a> State<'a> {
             timeout: None,
         });
 
-        // Upload
         self.update_projection(camera);
-        self.update_transforms(quads, tris);
+        // self.update_transforms(quads, tris);
+        self.update_transforms_new(tris); // still don't know why this is necessary to render the cube
 
         _ = self.queue.submit([]);
-
         _ = self.device.poll(wgpu::PollType::wait_indefinitely());
 
         let drawable = self.surface.get_current_texture()?;
@@ -373,9 +359,9 @@ impl<'a> State<'a> {
             resolve_target: None,
             ops: wgpu::Operations {
                 load: wgpu::LoadOp::Clear(wgpu::Color {
-                    r: 0.75,
-                    g: 0.5,
-                    b: 0.25,
+                    r: 0.0,
+                    g: 0.0,
+                    b: 0.01,
                     a: 1.0,
                 }),
                 store: wgpu::StoreOp::Store,

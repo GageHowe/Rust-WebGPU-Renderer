@@ -1,5 +1,6 @@
 use glm::{Vec3, cos, cross, max, min, normalize, radians, sin};
 
+/// still no idea wtf this is for
 pub struct Object {
     pub position: Vec3,
     pub angle: f32,

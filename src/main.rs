@@ -49,15 +49,14 @@ async fn run() {
 
     // Build world
     let mut world = World::new();
+
+    // without this the objects fail to render???
     world.tris.push(Object {
-        position: glm::Vec3::new(0.0, 0.0, -1.0),
+        position: glm::Vec3::new(0.0, 0.0, 0.0),
         angle: 0.0,
     });
-    world.quads.push(Object {
-        position: glm::Vec3::new(0.5, 0.0, -1.5),
-        angle: 0.0,
-    });
-    state.build_ubos_for_objects(2);
+
+    state.build_ubos_for_objects(1);
 
     while !state.window.should_close() {
         glfw.poll_events();
@@ -104,7 +103,7 @@ async fn run() {
             }
         }
 
-        match state.render(&world.quads, &world.tris, &world.camera) {
+        match state.render(&world.tris, &world.camera) {
             Ok(_) => {}
             Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
                 state.update_surface();

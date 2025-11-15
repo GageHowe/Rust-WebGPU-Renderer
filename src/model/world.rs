@@ -32,13 +32,6 @@ impl World {
         self.keys.insert(key, state);
     }
     pub fn update(&mut self, dt: f32, window: &mut Window) {
-        for i in 0..self.tris.len() {
-            self.tris[i].angle = self.tris[i].angle + 0.001 * dt;
-            if self.tris[i].angle > 360.0 {
-                self.tris[i].angle -= 360.0;
-            }
-        }
-
         let mouse_pos = window.get_cursor_pos();
         window.set_cursor_pos(400.0, 300.0);
         let dx = (-40.0 * (mouse_pos.0 - 400.0) / 400.0) as f32;
@@ -61,7 +54,6 @@ impl World {
             d_right = d_right + 0.1;
         }
 
-        // fly
         self.camera.position =
             self.camera.position + self.camera.right * d_right + self.camera.forwards * d_forwards;
     }
