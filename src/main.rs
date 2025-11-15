@@ -4,13 +4,13 @@ use std::sync::Mutex;
 
 use glfw::{Action, ClientApiHint, Key, WindowHint, fail_on_errors};
 mod renderer;
-use glm::Vector3;
 use renderer::renderer::State;
 mod model;
-use model::{game_objects::Object, world::World};
+use model::{game_objects::* /*world::World*/};
 mod physics;
 mod utility;
 use crate::physics::physics::PhysicsWorld;
+use glam::*;
 use physics::*;
 use rapier3d::math::Vector;
 use rapier3d::prelude::*;
@@ -29,8 +29,20 @@ impl AppState {
     }
 }
 
+fn update_camera(camera: &mut Camera, dt: f32, window: &mut glfw::Window) {
+    let mouse_pos = window.get_cursor_pos();
+    window.set_cursor_pos(400.0, 300.0);
+    let dx = (-40.0 * (mouse_pos.0 - 400.0) / 400.0) as f32;
+    let dy = (-40.0 * (mouse_pos.1 - 300.0) / 300.0) as f32;
+    camera.spin(dx, dy);
+    // camera.position = camera.position + camera.right * d_right + camera.forwards * d_forwards;
+}
+
 /// starts wgpu setup and loop
 async fn run() {
+    let mut objects: Vec<Object> = vec![];
+    let mut camera = Camera::new();
+
     let mut glfw = glfw::init(fail_on_errors!()).unwrap();
     glfw.window_hint(WindowHint::ClientApi(ClientApiHint::NoApi));
     let (mut window, events) = glfw
@@ -48,11 +60,10 @@ async fn run() {
     state.load_assets("assets/companion_cube/companion_cube.obj");
 
     // Build world
-    let mut world = World::new();
 
     // without this the objects fail to render???
-    world.tris.push(Object {
-        position: glm::Vec3::new(0.0, 0.0, 0.0),
+    objects.push(Object {
+        position: Vec3::new(0.0, 0.0, 0.0),
         angle: 0.0,
     });
 
@@ -61,7 +72,7 @@ async fn run() {
     while !state.window.should_close() {
         glfw.poll_events();
 
-        world.update(16.67, state.window);
+        update_camera(&mut camera, 16.67, state.window);
 
         for (_, event) in glfw::flush_messages(&events) {
             match event {
@@ -70,24 +81,14 @@ async fn run() {
                     state.window.set_should_close(true)
                 }
 
-                // fall back to world implementations
-                glfw::WindowEvent::Key(key, _, Action::Press, _) => {
-                    world.set_key(key, true);
-                }
-                glfw::WindowEvent::Key(key, _, Action::Release, _) => {
-                    world.keys.insert(key, false);
-                }
+                // // fall back to world implementations
+                // glfw::WindowEvent::Key(key, _, Action::Press, _) => {
+                //     world.set_key(key, true);
+                // }
+                // glfw::WindowEvent::Key(key, _, Action::Release, _) => {
+                //     world.keys.insert(key, false);
+                // }
 
-                /*world.tris.push(new_object);
-                let true_count = world.tris.len(); // Or all objects if using a unified list
-
-                if true_count > state.ubo.as_ref().unwrap().bind_groups.len() {
-                    state.ubo = Some(UBOGroup::new(&state.device, true_count, &state.bind_group_layouts[&BindScope::UBO]));
-                }
-
-                // On each frame:
-                state.ubo.as_mut().unwrap().upload(i as u64, &world.tris[i].calc_matrix(), &state.queue);
-                 */
                 // window moved
                 glfw::WindowEvent::Pos(..) => {
                     state.update_surface();
@@ -103,7 +104,7 @@ async fn run() {
             }
         }
 
-        match state.render(&world.tris, &world.camera) {
+        match state.render(&objects, &camera) {
             Ok(_) => {}
             Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
                 state.update_surface();

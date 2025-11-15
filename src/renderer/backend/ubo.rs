@@ -1,5 +1,6 @@
 use super::bind_group;
 use super::mesh_builder::any_as_u8_slice;
+use glam::*;
 
 /// for managing multiple uniforms (matrices) in one large buffer with proper alignment and per-object bind groups, useful when you have many objects.
 pub struct UBOGroup {
@@ -12,14 +13,14 @@ pub struct UBOGroup {
 
 impl UBOGroup {
     pub fn new(device: &wgpu::Device, object_count: usize, layout: &wgpu::BindGroupLayout) -> Self {
-        let allignment = glm::max(
-            device.limits().min_storage_buffer_offset_alignment as u32,
-            std::mem::size_of::<glm::Mat4>() as u32,
-        ) as u64;
+        let al = u64::max(
+            device.limits().min_storage_buffer_offset_alignment as u64,
+            std::mem::size_of::<Mat4>() as u64,
+        );
 
         let buffer_descriptor = wgpu::BufferDescriptor {
             label: Some("UBO"),
-            size: object_count as u64 * allignment,
+            size: object_count as u64 * al,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         };
@@ -30,18 +31,18 @@ impl UBOGroup {
         for i in 0..object_count {
             let mut builder = bind_group::Builder::new(device);
             builder.set_layout(layout);
-            builder.add_buffer(&buffer, i as u64 * allignment);
+            builder.add_buffer(&buffer, i as u64 * al);
             bind_groups.push(builder.build("Matrix"));
         }
 
         Self {
             buffer,
             bind_groups,
-            alignment: allignment,
+            alignment: al,
         }
     }
 
-    pub fn upload(&mut self, i: u64, matrix: &glm::Mat4, queue: &wgpu::Queue) {
+    pub fn upload(&mut self, i: u64, matrix: &Mat4, queue: &wgpu::Queue) {
         let offset = i * self.alignment;
         let data: &[u8] = unsafe { any_as_u8_slice(matrix) };
         queue.write_buffer(&self.buffer, offset, data);
@@ -58,7 +59,7 @@ impl UBO {
     pub fn new(device: &wgpu::Device, layout: &wgpu::BindGroupLayout) -> Self {
         let buffer_descriptor = wgpu::BufferDescriptor {
             label: Some("UBO"),
-            size: std::mem::size_of::<glm::Mat4>() as u64,
+            size: std::mem::size_of::<Mat4>() as u64,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         };
@@ -76,7 +77,7 @@ impl UBO {
         Self { buffer, bind_group }
     }
 
-    pub fn upload(&mut self, matrix: &glm::Mat4, queue: &wgpu::Queue) {
+    pub fn upload(&mut self, matrix: &Mat4, queue: &wgpu::Queue) {
         let offset = 0;
         let data: &[u8] = unsafe { any_as_u8_slice(matrix) };
         queue.write_buffer(&self.buffer, offset, data);

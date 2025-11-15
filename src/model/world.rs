@@ -1,10 +1,12 @@
+// deprecated but kept for historical reasons
+
 use crate::model::game_objects::{Camera, Object};
 use glfw::Window;
 use std::collections::HashMap;
 
 pub struct World {
     pub camera: Camera,
-    pub tris: Vec<Object>,
+    pub objects: Vec<Object>,
     pub keys: HashMap<glfw::Key, bool>,
 }
 
@@ -12,7 +14,7 @@ impl World {
     pub fn new() -> Self {
         let mut world = World {
             camera: Camera::new(),
-            tris: vec![],
+            objects: vec![],
             keys: HashMap::new(),
         };
 
@@ -29,7 +31,7 @@ impl World {
     pub fn set_key(&mut self, key: glfw::Key, state: bool) {
         self.keys.insert(key, state);
     }
-    pub fn update(&mut self, dt: f32, window: &mut Window) {
+    pub fn update_camera(&mut self, dt: f32, window: &mut Window) {
         let mouse_pos = window.get_cursor_pos();
         window.set_cursor_pos(400.0, 300.0);
         let dx = (-40.0 * (mouse_pos.0 - 400.0) / 400.0) as f32;

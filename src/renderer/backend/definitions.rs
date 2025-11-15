@@ -1,4 +1,4 @@
-use glm::*;
+use glam::*;
 
 #[derive(Eq, Hash, PartialEq)]
 pub enum BindScope {

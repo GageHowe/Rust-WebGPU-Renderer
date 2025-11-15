@@ -1,6 +1,6 @@
 use crate::renderer::backend::definitions::{Mesh, Model, PipelineType, Submesh, Vertex};
 use crate::utility::string::split;
-use glm::*;
+use glam::*;
 use std::collections::HashMap;
 use std::path::Path;
 use wgpu::util::DeviceExt;
@@ -85,7 +85,7 @@ impl ObjLoader {
                 let nx = mesh.normals.get(i * 3).cloned().unwrap_or(0.0);
                 let ny = mesh.normals.get(i * 3 + 1).cloned().unwrap_or(0.0);
                 let nz = mesh.normals.get(i * 3 + 2).cloned().unwrap_or(0.0);
-                let n = glm::normalize(*pre_transform * Vec4::new(nx, ny, nz, 0.0));
+                let n = (*pre_transform * Vec4::new(nx, ny, nz, 0.0)).normalize();
 
                 vertex_data.push(ModelVertex {
                     position: Vec3::new(p.x, p.y, p.z),

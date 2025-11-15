@@ -2,7 +2,7 @@ use crate::renderer::backend::mesh_builder::any_as_u8_slice;
 use std::env::current_dir;
 use wgpu::util::DeviceExt;
 
-use glm::Vec4;
+use glam::*;
 
 use super::bind_group;
 

@@ -8,7 +8,8 @@ use crate::renderer::backend::{
     ubo::{UBO, UBOGroup},
 };
 use glfw::Window;
-use glm::*;
+// use glm::*;
+use glam::*;
 use std::collections::HashMap;
 
 use super::backend::definitions::{BindScope, Material, ModelVertex, PipelineType};
@@ -175,12 +176,14 @@ impl<'a> State<'a> {
     pub fn load_assets(&mut self, filepath: &str) {
         let mut loader = ObjLoader::new();
 
-        // goofy identity matrix
-        let c0 = glm::Vec4::new(1.0, 0.0, 0.0, 0.0);
-        let c1 = glm::Vec4::new(0.0, 1.0, 0.0, 0.0);
-        let c2 = glm::Vec4::new(0.0, 0.0, 1.0, 0.0);
-        let c3 = glm::Vec4::new(0.0, 0.0, 0.0, 1.0);
-        let pre_transform = glm::Matrix4::new(c0, c1, c2, c3);
+        // // goofy identity matrix
+        // let c0 = glm::Vec4::new(1.0, 0.0, 0.0, 0.0);
+        // let c1 = glm::Vec4::new(0.0, 1.0, 0.0, 0.0);
+        // let c2 = glm::Vec4::new(0.0, 0.0, 1.0, 0.0);
+        // let c3 = glm::Vec4::new(0.0, 0.0, 0.0, 1.0);
+        // let pre_transform = glm::Matrix4::new(c0, c1, c2, c3);
+
+        let pre_transform = glam::Mat4::IDENTITY;
 
         self.models
             .push(loader.load(filepath, &mut self.materials, &self.device, &pre_transform));
@@ -235,69 +238,41 @@ impl<'a> State<'a> {
     }
 
     fn update_projection(&mut self, camera: &Camera) {
-        let c0 = glm::Vec4::new(camera.right.x, camera.up.x, -camera.forwards.x, 0.0);
-        let c1 = glm::Vec4::new(camera.right.y, camera.up.y, -camera.forwards.y, 0.0);
-        let c2 = glm::Vec4::new(camera.right.z, camera.up.z, -camera.forwards.z, 0.0);
-        let a: f32 = -dot(camera.right, camera.position);
-        let b: f32 = -dot(camera.up, camera.position);
-        let c: f32 = dot(camera.forwards, camera.position);
-        let c3 = glm::Vec4::new(a, b, c, 1.0);
-        let view = glm::Matrix4::new(c0, c1, c2, c3);
+        // Vectors for view matrix columns
+        let c0 = Vec4::new(camera.right.x, camera.up.x, -camera.forwards.x, 0.0);
+        let c1 = Vec4::new(camera.right.y, camera.up.y, -camera.forwards.y, 0.0);
+        let c2 = Vec4::new(camera.right.z, camera.up.z, -camera.forwards.z, 0.0);
+        let a: f32 = -camera.right.dot(camera.position);
+        let b: f32 = -camera.up.dot(camera.position);
+        let c: f32 = camera.forwards.dot(camera.position);
+        let c3 = Vec4::new(a, b, c, 1.0);
 
-        let fov_y: f32 = radians(80.0);
+        let view = Mat4::from_cols(c0, c1, c2, c3);
+
+        let fov_y: f32 = 80.0_f32.to_radians();
         let aspect = 4.0 / 3.0;
         let z_near = 0.5;
         let z_far = 1000.0;
-        let projection = ext::perspective(fov_y, aspect, z_near, z_far);
+        let projection = Mat4::perspective_rh(fov_y, aspect, z_near, z_far);
 
         let view_proj = projection * view;
+
         self.projection_ubo.upload(&view_proj, &self.queue);
     }
 
-    fn update_transforms(&mut self, quads: &Vec<Object>, tris: &Vec<Object>) {
-        let mut offset: u64 = 0;
-        for i in 0..quads.len() {
-            let c0 = glm::Vec4::new(1.0, 0.0, 0.0, 0.0);
-            let c1 = glm::Vec4::new(0.0, 1.0, 0.0, 0.0);
-            let c2 = glm::Vec4::new(0.0, 0.0, 1.0, 0.0);
-            let c3 = glm::Vec4::new(0.0, 0.0, 0.0, 1.0);
-            let m1 = glm::Matrix4::new(c0, c1, c2, c3);
-            let m2 = glm::Matrix4::new(c0, c1, c2, c3);
-            let matrix = ext::rotate(&m2, quads[i].angle, glm::Vector3::new(0.0, 0.0, 1.0))
-                * ext::translate(&m1, quads[i].position);
-            self.ubo
-                .as_mut()
-                .unwrap()
-                .upload(offset + i as u64, &matrix, &self.queue);
-        }
-
-        offset = quads.len() as u64;
-        for i in 0..tris.len() {
-            let c0 = glm::Vec4::new(1.0, 0.0, 0.0, 0.0);
-            let c1 = glm::Vec4::new(0.0, 1.0, 0.0, 0.0);
-            let c2 = glm::Vec4::new(0.0, 0.0, 1.0, 0.0);
-            let c3 = glm::Vec4::new(0.0, 0.0, 0.0, 1.0);
-            let m1 = glm::Matrix4::new(c0, c1, c2, c3);
-            let m2 = glm::Matrix4::new(c0, c1, c2, c3);
-            let matrix = ext::rotate(&m2, tris[i].angle, glm::Vector3::new(0.0, 0.0, 1.0))
-                * ext::translate(&m1, tris[i].position);
-            self.ubo
-                .as_mut()
-                .unwrap()
-                .upload(offset + i as u64, &matrix, &self.queue);
-        }
-    }
-
     fn update_transforms_new(&mut self, objects: &Vec<Object>) {
-        for i in 0..objects.len() {
-            let c0 = glm::Vec4::new(1.0, 0.0, 0.0, 0.0);
-            let c1 = glm::Vec4::new(0.0, 1.0, 0.0, 0.0);
-            let c2 = glm::Vec4::new(0.0, 0.0, 1.0, 0.0);
-            let c3 = glm::Vec4::new(0.0, 0.0, 0.0, 1.0);
-            let m1 = glm::Matrix4::new(c0, c1, c2, c3);
-            let m2 = glm::Matrix4::new(c0, c1, c2, c3);
-            let matrix = ext::rotate(&m2, objects[i].angle, glm::Vector3::new(0.0, 0.0, 1.0))
-                * ext::translate(&m1, objects[i].position);
+        for (i, obj) in objects.iter().enumerate() {
+            let m1 = Mat4::IDENTITY;
+            let m2 = Mat4::IDENTITY;
+
+            // Create a rotation matrix around Z by obj.angle (in radians)
+            let rotation = Mat4::from_rotation_z(obj.angle);
+            // Create a translation matrix to obj.position
+            let translation = Mat4::from_translation(obj.position);
+
+            // matrix = rotation * translation (order matches glm approach)
+            let matrix = rotation * translation;
+
             self.ubo
                 .as_mut()
                 .unwrap()
