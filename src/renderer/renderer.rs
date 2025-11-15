@@ -1,5 +1,5 @@
 // use crate::model::game_objects::{Camera, Object};
-use crate::renderer::backend::definitions::{Camera, Mesh, Model, Object, Vertex};
+use crate::renderer::backend::definitions::{Camera, Model, Object, Vertex};
 use crate::renderer::backend::{
     bind_group_layout,
     mesh_builder::ObjLoader,
@@ -7,9 +7,8 @@ use crate::renderer::backend::{
     texture::{Texture, new_color, new_depth_texture, new_texture},
     ubo::{UBO, UBOGroup},
 };
-use glfw::Window;
-// use glm::*;
 use glam::*;
+use glfw::Window;
 use std::collections::HashMap;
 
 use super::backend::definitions::{BindScope, Material, ModelVertex, PipelineType};
@@ -20,7 +19,9 @@ pub struct State<'a> {
     /// the part of the window that we draw to
     surface: wgpu::Surface<'a>,
     device: wgpu::Device,
+    /// executes recorded CommandBuffer objects and provides convenience methods for writing to buffers
     queue: wgpu::Queue,
+    /// screen size, max latency, etc
     config: wgpu::SurfaceConfiguration,
     pub size: (i32, i32),
     /// struct that wraps a *GLFWWindow handle
@@ -176,17 +177,12 @@ impl<'a> State<'a> {
     pub fn load_assets(&mut self, filepath: &str) {
         let mut loader = ObjLoader::new();
 
-        // // goofy identity matrix
-        // let c0 = glm::Vec4::new(1.0, 0.0, 0.0, 0.0);
-        // let c1 = glm::Vec4::new(0.0, 1.0, 0.0, 0.0);
-        // let c2 = glm::Vec4::new(0.0, 0.0, 1.0, 0.0);
-        // let c3 = glm::Vec4::new(0.0, 0.0, 0.0, 1.0);
-        // let pre_transform = glm::Matrix4::new(c0, c1, c2, c3);
-
-        let pre_transform = glam::Mat4::IDENTITY;
-
-        self.models
-            .push(loader.load(filepath, &mut self.materials, &self.device, &pre_transform));
+        self.models.push(loader.load(
+            filepath,
+            &mut self.materials,
+            &self.device,
+            &glam::Mat4::IDENTITY,
+        ));
 
         for material in &mut self.materials {
             material.bind_group = match material.pipeline_type {

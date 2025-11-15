@@ -63,6 +63,7 @@ impl Vertex {
     }
 }
 
+/// describes a vertex with its position, texture coordinates, and normal
 #[repr(C)] // C-style data layout
 pub struct ModelVertex {
     pub position: Vec3,
@@ -85,10 +86,10 @@ impl ModelVertex {
     }
 }
 
-pub struct Mesh {
-    pub buffer: wgpu::Buffer,
-    pub offset: u64,
-}
+// pub struct Mesh {
+//     pub buffer: wgpu::Buffer,
+//     pub offset: u64,
+// }
 
 pub struct Camera {
     pub position: Vec3,

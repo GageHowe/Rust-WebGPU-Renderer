@@ -1,4 +1,4 @@
-use crate::renderer::backend::definitions::{Mesh, Model, PipelineType, Submesh, Vertex};
+use crate::renderer::backend::definitions::{Model, PipelineType, Submesh, Vertex};
 // use crate::utility::string::split;
 use glam::*;
 use std::collections::HashMap;
@@ -6,17 +6,6 @@ use std::path::Path;
 use wgpu::util::DeviceExt;
 
 use super::definitions::{Material, ModelVertex};
-
-// pub fn split(line: &str, token: &str) -> Vec<String> {
-//     let mut words: Vec<String> = Vec::new();
-//     let iterator = line.split(token);
-
-//     for word in iterator {
-//         words.push(word.to_string());
-//     }
-
-//     words
-// }
 
 // From: https://stackoverflow.com/questions/28127165/how-to-convert-struct-to-u8
 pub unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {

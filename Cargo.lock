@@ -1409,6 +1409,7 @@ name = "project"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "bytemuck",
  "glam 0.30.9",
  "glfw",
  "image",
