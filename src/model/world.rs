@@ -1,10 +1,8 @@
-use crate::model::game_objects::{Camera, Object};
+use crate::model::game_objects::Camera;
 use glfw::Window;
 use std::collections::HashMap;
 
 pub struct World {
-    pub quads: Vec<Object>,
-    pub tris: Vec<Object>,
     pub camera: Camera,
     pub keys: HashMap<glfw::Key, bool>,
 }
@@ -12,8 +10,6 @@ pub struct World {
 impl World {
     pub fn new() -> Self {
         let mut world = World {
-            quads: Vec::new(),
-            tris: Vec::new(),
             camera: Camera::new(),
             keys: HashMap::new(),
         };
