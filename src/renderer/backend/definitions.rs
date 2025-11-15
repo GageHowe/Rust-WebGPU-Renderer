@@ -100,10 +100,18 @@ pub struct Camera {
     pub pitch: f32,
 }
 
-/// still no idea wtf this is for
-pub struct Object {
+/// This describes information needed to send information about multiple instances
+/// of a model to the GPU for batching/instancing.
+/// https://sotrh.github.io/learn-wgpu/beginner/tutorial7-instancing/
+pub struct InstanceData {
     pub position: Vec3,
-    pub angle: f32,
+    pub rotation: glam::Quat,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct InstanceRaw {
+    model: [[f32; 4]; 4],
 }
 
 impl Camera {

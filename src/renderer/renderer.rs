@@ -1,5 +1,5 @@
 // use crate::model::game_objects::{Camera, Object};
-use crate::renderer::backend::definitions::{Camera, Model, Object, Vertex};
+use crate::renderer::backend::definitions::{Camera, InstanceData, Model, Vertex};
 use crate::renderer::backend::{
     bind_group_layout,
     mesh_builder::ObjLoader,
@@ -13,7 +13,7 @@ use std::collections::HashMap;
 
 use super::backend::definitions::{BindScope, Material, ModelVertex, PipelineType};
 
-pub struct State<'a> {
+pub struct RendererState<'a> {
     /// a handle to our GPU
     instance: wgpu::Instance,
     /// the part of the window that we draw to
@@ -35,7 +35,7 @@ pub struct State<'a> {
     depth_buffer: Texture,
 }
 
-impl<'a> State<'a> {
+impl<'a> RendererState<'a> {
     pub async fn new(window: &'a mut Window) -> Self {
         let size = window.get_framebuffer_size();
 
@@ -256,15 +256,12 @@ impl<'a> State<'a> {
         self.projection_ubo.upload(&view_proj, &self.queue);
     }
 
-    fn update_transforms(&mut self, objects: &Vec<Object>) {
+    fn update_transforms(&mut self, objects: &Vec<InstanceData>) {
         for (i, obj) in objects.iter().enumerate() {
-            // let m1 = Mat4::IDENTITY;
-            // let m2 = Mat4::IDENTITY;
-            let rotation = Mat4::from_rotation_z(obj.angle);
+            // let rotation = Mat4::from_rotation_z(obj.angle);
+            let rotation = Mat4::from_quat(obj.rotation);
             let translation = Mat4::from_translation(obj.position);
-
             let matrix = rotation * translation;
-
             self.ubo
                 .as_mut()
                 .unwrap()
@@ -294,7 +291,7 @@ impl<'a> State<'a> {
 
     pub fn render(
         &mut self,
-        tris: &Vec<Object>,
+        tris: &Vec<InstanceData>,
         camera: &Camera,
     ) -> Result<(), wgpu::SurfaceError> {
         // self.device.poll(wgpu::MaintainBase::Wait).ok();
@@ -321,21 +318,6 @@ impl<'a> State<'a> {
             .device
             .create_command_encoder(&command_encoder_descriptor);
 
-        let color_attachment = wgpu::RenderPassColorAttachment {
-            view: &image_view,
-            resolve_target: None,
-            ops: wgpu::Operations {
-                load: wgpu::LoadOp::Clear(wgpu::Color {
-                    r: 0.0,
-                    g: 0.0,
-                    b: 0.01,
-                    a: 1.0,
-                }),
-                store: wgpu::StoreOp::Store,
-            },
-            depth_slice: None,
-        };
-
         let depth_stencil_attachment = wgpu::RenderPassDepthStencilAttachment {
             view: &self.depth_buffer.view,
             depth_ops: Some(wgpu::Operations {
@@ -345,21 +327,33 @@ impl<'a> State<'a> {
             stencil_ops: None,
         };
 
-        let render_pass_descriptor = wgpu::RenderPassDescriptor {
-            label: Some("Render Pass"),
-            color_attachments: &[Some(color_attachment)],
-            depth_stencil_attachment: Some(depth_stencil_attachment),
-            occlusion_query_set: None,
-            timestamp_writes: None,
-        };
-
         {
-            let mut renderpass = command_encoder.begin_render_pass(&render_pass_descriptor);
+            let mut renderpass = command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &image_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.0,
+                            g: 0.0,
+                            b: 0.01,
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                    depth_slice: None,
+                })],
+                depth_stencil_attachment: Some(depth_stencil_attachment),
+                occlusion_query_set: None,
+                timestamp_writes: None,
+            });
             renderpass.set_pipeline(&self.render_pipelines[&PipelineType::Simple]);
             renderpass.set_bind_group(2, &self.projection_ubo.bind_group, &[]);
 
             self.render_model(&self.models[0], &mut renderpass);
         }
+
         self.queue.submit(std::iter::once(command_encoder.finish()));
         let _ = self.device.poll(wgpu::PollType::Wait {
             submission_index: None,
@@ -367,7 +361,6 @@ impl<'a> State<'a> {
         });
 
         drawable.present();
-
         Ok(())
     }
 }

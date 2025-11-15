@@ -4,8 +4,8 @@ use std::sync::Mutex;
 
 use glfw::{Action, ClientApiHint, Key, WindowHint, fail_on_errors};
 mod renderer;
-use renderer::backend::definitions::{Camera, Object};
-use renderer::renderer::State;
+use renderer::backend::definitions::{Camera, InstanceData};
+use renderer::renderer::RendererState;
 // mod model;
 // use model::game_objects::*;
 mod physics;
@@ -41,7 +41,7 @@ fn update_camera(camera: &mut Camera, dt: f32, window: &mut glfw::Window) {
 
 /// starts wgpu setup and loop
 async fn run() {
-    let mut objects: Vec<Object> = vec![];
+    let mut object_instances: Vec<InstanceData> = vec![];
     let mut camera = Camera::new();
 
     let mut glfw = glfw::init(fail_on_errors!()).unwrap();
@@ -50,7 +50,7 @@ async fn run() {
         .create_window(800, 600, "wgpu", glfw::WindowMode::Windowed)
         .unwrap();
 
-    let mut state = State::new(&mut window).await;
+    let mut state = RendererState::new(&mut window).await;
 
     state.window.set_framebuffer_size_polling(true);
     state.window.set_key_polling(true);
@@ -60,12 +60,12 @@ async fn run() {
 
     state.load_assets("assets/companion_cube/companion_cube.obj");
 
-    // Build world
-
     // without this the objects fail to render???
-    objects.push(Object {
+    // yeah dumbass, it's an instance of the object
+    object_instances.push(InstanceData {
         position: Vec3::new(0.0, 0.0, 0.0),
-        angle: 0.0,
+        // angle: 0.0,
+        rotation: glam::quat(0.0, 0.0, 0.0, 0.0),
     });
 
     state.build_ubos_for_objects(1);
@@ -105,7 +105,7 @@ async fn run() {
             }
         }
 
-        match state.render(&objects, &camera) {
+        match state.render(&object_instances, &camera) {
             Ok(_) => {}
             Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
                 state.update_surface();
