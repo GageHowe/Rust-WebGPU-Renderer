@@ -1,7 +1,7 @@
-use crate::model::game_objects::{Camera, Object};
-use crate::renderer::backend::definitions::{Mesh, Model, Vertex};
+// use crate::model::game_objects::{Camera, Object};
+use crate::renderer::backend::definitions::{Camera, Mesh, Model, Object, Vertex};
 use crate::renderer::backend::{
-    bind_group_layout, mesh_builder,
+    bind_group_layout,
     mesh_builder::ObjLoader,
     pipeline,
     texture::{Texture, new_color, new_depth_texture, new_texture},
@@ -260,17 +260,13 @@ impl<'a> State<'a> {
         self.projection_ubo.upload(&view_proj, &self.queue);
     }
 
-    fn update_transforms_new(&mut self, objects: &Vec<Object>) {
+    fn update_transforms(&mut self, objects: &Vec<Object>) {
         for (i, obj) in objects.iter().enumerate() {
-            let m1 = Mat4::IDENTITY;
-            let m2 = Mat4::IDENTITY;
-
-            // Create a rotation matrix around Z by obj.angle (in radians)
+            // let m1 = Mat4::IDENTITY;
+            // let m2 = Mat4::IDENTITY;
             let rotation = Mat4::from_rotation_z(obj.angle);
-            // Create a translation matrix to obj.position
             let translation = Mat4::from_translation(obj.position);
 
-            // matrix = rotation * translation (order matches glm approach)
             let matrix = rotation * translation;
 
             self.ubo
@@ -313,7 +309,7 @@ impl<'a> State<'a> {
 
         self.update_projection(camera);
         // self.update_transforms(quads, tris);
-        self.update_transforms_new(tris); // still don't know why this is necessary to render the cube
+        self.update_transforms(tris); // still don't know why this is necessary to render the cube
 
         _ = self.queue.submit([]);
         _ = self.device.poll(wgpu::PollType::wait_indefinitely());

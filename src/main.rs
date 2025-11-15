@@ -4,11 +4,12 @@ use std::sync::Mutex;
 
 use glfw::{Action, ClientApiHint, Key, WindowHint, fail_on_errors};
 mod renderer;
+use renderer::backend::definitions::{Camera, Object};
 use renderer::renderer::State;
-mod model;
-use model::{game_objects::* /*world::World*/};
+// mod model;
+// use model::game_objects::*;
 mod physics;
-mod utility;
+// mod utility;
 use crate::physics::physics::PhysicsWorld;
 use glam::*;
 use physics::*;
@@ -115,7 +116,6 @@ async fn run() {
     }
 }
 
-/// starts the physics thread. This should only be running once
 fn physics_thread(appstate: AppState) {
     println!("Physics thread starting");
 
