@@ -10,8 +10,10 @@ use crate::renderer::backend::{
 use glam::*;
 use glfw::Window;
 use std::collections::HashMap;
+use wgpu::VertexBufferLayout;
+use wgpu::util::DeviceExt;
 
-use super::backend::definitions::{BindScope, Material, ModelVertex, PipelineType};
+use super::backend::definitions::*;
 
 pub struct RendererState<'a> {
     /// a handle to our GPU
@@ -27,12 +29,16 @@ pub struct RendererState<'a> {
     /// struct that wraps a *GLFWWindow handle
     pub window: &'a mut Window,
     render_pipelines: HashMap<PipelineType, wgpu::RenderPipeline>,
-    pub ubo: Option<UBOGroup>,
+    pub ubo_group: Option<UBOGroup>,
     projection_ubo: UBO,
     bind_group_layouts: HashMap<BindScope, wgpu::BindGroupLayout>,
     models: Vec<Model>,
     materials: Vec<Material>,
     depth_buffer: Texture,
+    pub object_instances: Vec<InstanceData>,
+    // /// currently only supports one kind of object
+    // instance_buffer: Option<wgpu::Buffer>,
+    // instance_count: usize,
 }
 
 impl<'a> RendererState<'a> {
@@ -90,6 +96,8 @@ impl<'a> RendererState<'a> {
 
         let depth_buffer = new_depth_texture(&device, &config, "Depth Buffer");
 
+        // let i_b = Some(device.create_buffer_init(VertexBufferLayout{
+        // }));
         Self {
             instance,
             window,
@@ -99,12 +107,15 @@ impl<'a> RendererState<'a> {
             config,
             size,
             render_pipelines,
-            ubo: None,
+            ubo_group: None,
             projection_ubo: projection_ubo,
             bind_group_layouts: bind_group_layouts,
             models: Vec::new(),
             materials: Vec::new(),
             depth_buffer,
+            object_instances: Vec::new(),
+            // i_b,
+            // 0,
         }
     }
 
@@ -226,7 +237,7 @@ impl<'a> RendererState<'a> {
     }
 
     pub fn build_ubos_for_objects(&mut self, object_count: usize) {
-        self.ubo = Some(UBOGroup::new(
+        self.ubo_group = Some(UBOGroup::new(
             &self.device,
             object_count,
             &self.bind_group_layouts[&BindScope::UBO],
@@ -262,12 +273,27 @@ impl<'a> RendererState<'a> {
             let rotation = Mat4::from_quat(obj.rotation);
             let translation = Mat4::from_translation(obj.position);
             let matrix = rotation * translation;
-            self.ubo
+            self.ubo_group
                 .as_mut()
                 .unwrap()
                 .upload(i as u64, &matrix, &self.queue);
         }
     }
+
+    // pub fn update_instance_buffer(&mut self, instances: &[InstanceData]) {
+    //     let instance_data: Vec<InstanceRaw> =
+    //         instances.iter().map(InstanceRaw::from_instance).collect();
+
+    //     let buffer = self
+    //         .device
+    //         .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+    //             label: Some("Instance Buffer"),
+    //             contents: bytemuck::cast_slice(&instance_data),
+    //             usage: wgpu::BufferUsages::VERTEX,
+    //         });
+    //     // self.instance_buffer = Some(buffer);
+    //     // self.instance_count = instances.len();
+    // }
 
     fn render_model(&self, model: &Model, renderpass: &mut wgpu::RenderPass) {
         // Bind vertex and index buffer
@@ -278,7 +304,7 @@ impl<'a> RendererState<'a> {
         );
 
         // Transforms
-        renderpass.set_bind_group(1, &(self.ubo.as_ref().unwrap()).bind_groups[0], &[]);
+        renderpass.set_bind_group(1, &(self.ubo_group.as_ref().unwrap()).bind_groups[0], &[]);
         //renderpass.set_bind_group(2, &self.projection_ubo.bind_group, &[]);
 
         for submesh in &model.submeshes {
@@ -286,12 +312,17 @@ impl<'a> RendererState<'a> {
             renderpass.set_pipeline(&self.render_pipelines[&material.pipeline_type]);
             renderpass.set_bind_group(0, (material.bind_group).as_ref().unwrap(), &[]);
             renderpass.draw_indexed(0..submesh.index_count, submesh.first_index, 0..1);
+            // renderpass.draw_indexed(
+            //     0..submesh.index_count,
+            //     submesh.first_index,
+            //     0..object_instances.len() as u32,
+            // );
         }
     }
 
     pub fn render(
         &mut self,
-        tris: &Vec<InstanceData>,
+        instances: &Vec<InstanceData>,
         camera: &Camera,
     ) -> Result<(), wgpu::SurfaceError> {
         // self.device.poll(wgpu::MaintainBase::Wait).ok();
@@ -302,7 +333,7 @@ impl<'a> RendererState<'a> {
 
         self.update_projection(camera);
         // self.update_transforms(quads, tris);
-        self.update_transforms(tris); // still don't know why this is necessary to render the cube
+        self.update_transforms(instances); // still don't know why this is necessary to render the cube
 
         _ = self.queue.submit([]);
         _ = self.device.poll(wgpu::PollType::wait_indefinitely());
@@ -351,7 +382,10 @@ impl<'a> RendererState<'a> {
             renderpass.set_pipeline(&self.render_pipelines[&PipelineType::Simple]);
             renderpass.set_bind_group(2, &self.projection_ubo.bind_group, &[]);
 
-            self.render_model(&self.models[0], &mut renderpass);
+            // self.render_model(&self.models[0], &mut renderpass);
+            for model in &self.models {
+                self.render_model(model, &mut renderpass);
+            }
         }
 
         self.queue.submit(std::iter::once(command_encoder.finish()));

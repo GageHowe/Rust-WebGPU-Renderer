@@ -1,4 +1,4 @@
-use crate::renderer::backend::definitions::{Model, PipelineType, Submesh, Vertex};
+use crate::renderer::backend::definitions::{Model, PipelineType, Submesh};
 // use crate::utility::string::split;
 use glam::*;
 use std::collections::HashMap;

@@ -22,7 +22,7 @@ pub struct AppState {
 }
 
 impl AppState {
-    /// consume and guard the physics world
+    /// consume and wrap the physics world reference
     pub fn new(world: PhysicsWorld) -> Self {
         AppState {
             phys_world: Mutex::new(world),
@@ -36,10 +36,8 @@ fn update_camera(camera: &mut Camera, dt: f32, window: &mut glfw::Window) {
     let dx = (-40.0 * (mouse_pos.0 - 400.0) / 400.0) as f32;
     let dy = (-40.0 * (mouse_pos.1 - 300.0) / 300.0) as f32;
     camera.spin(dx, dy);
-    // camera.position = camera.position + camera.right * d_right + camera.forwards * d_forwards;
 }
 
-/// starts wgpu setup and loop
 async fn run() {
     let mut object_instances: Vec<InstanceData> = vec![];
     let mut camera = Camera::new();
@@ -59,16 +57,24 @@ async fn run() {
     state.window.set_cursor_mode(glfw::CursorMode::Hidden);
 
     state.load_assets("assets/companion_cube/companion_cube.obj");
+    state.load_assets("assets/companion_cube/companion_cube.obj");
 
     // without this the objects fail to render???
     // yeah dumbass, it's an instance of the object
+    object_instances.push(InstanceData {
+        position: Vec3::new(0.0, 0.0, 20.0),
+        rotation: glam::quat(0.0, 0.0, 0.0, 0.0),
+    });
+
     object_instances.push(InstanceData {
         position: Vec3::new(0.0, 0.0, 0.0),
         // angle: 0.0,
         rotation: glam::quat(0.0, 0.0, 0.0, 0.0),
     });
 
-    state.build_ubos_for_objects(1);
+    // build_ubos_for_objects(2);
+    state.build_ubos_for_objects(object_instances.len());
+    // state.update_instance_buffer(&object_instances);
 
     while !state.window.should_close() {
         glfw.poll_events();
@@ -81,14 +87,6 @@ async fn run() {
                 glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
                     state.window.set_should_close(true)
                 }
-
-                // // fall back to world implementations
-                // glfw::WindowEvent::Key(key, _, Action::Press, _) => {
-                //     world.set_key(key, true);
-                // }
-                // glfw::WindowEvent::Key(key, _, Action::Release, _) => {
-                //     world.keys.insert(key, false);
-                // }
 
                 // window moved
                 glfw::WindowEvent::Pos(..) => {

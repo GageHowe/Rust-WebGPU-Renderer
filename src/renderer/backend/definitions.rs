@@ -45,6 +45,7 @@ pub struct Model {
     pub submeshes: Vec<Submesh>,
 }
 
+/// is this for raw tris? need to safely deprecate
 #[repr(C)] // C-style data layout
 pub struct Vertex {
     pub position: Vec3,
@@ -108,10 +109,23 @@ pub struct InstanceData {
     pub rotation: glam::Quat,
 }
 
+/// packed struct for communicating instance transforms to the GPU
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-struct InstanceRaw {
+pub struct InstanceRaw {
     model: [[f32; 4]; 4],
+}
+
+impl InstanceRaw {
+    /// helper for packing an InstanceData into a InstanceRaw to be sent in a buffer to the GPU
+    pub fn from_instance(instance: &InstanceData) -> Self {
+        let rotation = Mat4::from_quat(instance.rotation);
+        let translation = Mat4::from_translation(instance.position);
+        let model = translation * rotation;
+        InstanceRaw {
+            model: model.to_cols_array_2d(),
+        }
+    }
 }
 
 impl Camera {
