@@ -46,6 +46,7 @@ impl ObjLoader {
         for m in materials.unwrap_or_default() {
             let mut mat = Material::new();
 
+            // if the model has a texture, make sure it runs through the TexturedModel pipeline
             if let Some(path) = m.diffuse_texture {
                 mat.pipeline_type = PipelineType::TexturedModel;
                 mat.filename = Some(mtl_dir.join(path).to_string_lossy().to_string());

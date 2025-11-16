@@ -104,6 +104,7 @@ pub struct Camera {
 /// This describes information needed to send information about multiple instances
 /// of a model to the GPU for batching/instancing.
 /// https://sotrh.github.io/learn-wgpu/beginner/tutorial7-instancing/
+#[derive(Clone)]
 pub struct InstanceData {
     pub position: Vec3,
     pub rotation: glam::Quat,

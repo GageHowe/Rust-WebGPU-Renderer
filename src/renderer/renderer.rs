@@ -295,7 +295,12 @@ impl<'a> RendererState<'a> {
     //     // self.instance_count = instances.len();
     // }
 
-    fn render_model(&self, model: &Model, renderpass: &mut wgpu::RenderPass) {
+    fn render_model(
+        &self,
+        objs: &Vec<InstanceData>,
+        model: &Model,
+        renderpass: &mut wgpu::RenderPass,
+    ) {
         // Bind vertex and index buffer
         renderpass.set_vertex_buffer(0, model.buffer.slice(0..model.ebo_offset));
         renderpass.set_index_buffer(
@@ -305,18 +310,18 @@ impl<'a> RendererState<'a> {
 
         // Transforms
         renderpass.set_bind_group(1, &(self.ubo_group.as_ref().unwrap()).bind_groups[0], &[]);
-        //renderpass.set_bind_group(2, &self.projection_ubo.bind_group, &[]);
+        //renderpass.set_bind_group(2, &self.proselfjection_ubo.bind_group, &[]);
 
         for submesh in &model.submeshes {
             let material = &self.materials[submesh.material_id];
             renderpass.set_pipeline(&self.render_pipelines[&material.pipeline_type]);
             renderpass.set_bind_group(0, (material.bind_group).as_ref().unwrap(), &[]);
-            renderpass.draw_indexed(0..submesh.index_count, submesh.first_index, 0..1);
-            // renderpass.draw_indexed(
-            //     0..submesh.index_count,
-            //     submesh.first_index,
-            //     0..object_instances.len() as u32,
-            // );
+            // renderpass.draw_indexed(0..submesh.index_count, submesh.first_index, 0..1);
+            renderpass.draw_indexed(
+                0..submesh.index_count,
+                submesh.first_index,
+                0..objs.len() as u32,
+            );
         }
     }
 
@@ -382,9 +387,28 @@ impl<'a> RendererState<'a> {
             renderpass.set_pipeline(&self.render_pipelines[&PipelineType::Simple]);
             renderpass.set_bind_group(2, &self.projection_ubo.bind_group, &[]);
 
-            // self.render_model(&self.models[0], &mut renderpass);
-            for model in &self.models {
-                self.render_model(model, &mut renderpass);
+            // RENDER THE MODEL INSTANCES
+            // self.render_model(instances, &self.models[0], &mut renderpass);
+            let model = &self.models[0]; // inlined
+            renderpass.set_vertex_buffer(0, model.buffer.slice(0..model.ebo_offset));
+            renderpass.set_index_buffer(
+                model.buffer.slice(model.ebo_offset..),
+                wgpu::IndexFormat::Uint32,
+            );
+
+            renderpass.set_bind_group(1, &(self.ubo_group.as_ref().unwrap()).bind_groups[0], &[]);
+            //renderpass.set_bind_group(2, &self.proselfjection_ubo.bind_group, &[]);
+
+            for submesh in &model.submeshes {
+                let material = &self.materials[submesh.material_id];
+                renderpass.set_pipeline(&self.render_pipelines[&material.pipeline_type]);
+                renderpass.set_bind_group(0, (material.bind_group).as_ref().unwrap(), &[]);
+                renderpass.draw_indexed(0..submesh.index_count, submesh.first_index, 0..1);
+                // renderpass.draw_indexed(
+                //     0..submesh.index_count,
+                //     submesh.first_index,
+                //     0..self.object_instances.len() as u32,
+                // );
             }
         }
 
