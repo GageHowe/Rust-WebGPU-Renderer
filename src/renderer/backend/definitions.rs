@@ -45,25 +45,6 @@ pub struct Model {
     pub submeshes: Vec<Submesh>,
 }
 
-// /// is this for raw tris? need to safely deprecate
-// #[repr(C)] // C-style data layout
-// pub struct Vertex {
-//     pub position: Vec3,
-//     pub color: Vec3,
-// }
-
-// impl Vertex {
-//     pub fn get_layout() -> wgpu::VertexBufferLayout<'static> {
-//         const ATTRIBUTES: [wgpu::VertexAttribute; 2] =
-//             wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3];
-//         wgpu::VertexBufferLayout {
-//             array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
-//             step_mode: wgpu::VertexStepMode::Vertex,
-//             attributes: &ATTRIBUTES,
-//         }
-//     }
-// }
-
 /// describes a vertex with its position, texture coordinates, and normal
 #[repr(C)] // C-style data layout
 pub struct ModelVertex {
@@ -86,11 +67,6 @@ impl ModelVertex {
         }
     }
 }
-
-// pub struct Mesh {
-//     pub buffer: wgpu::Buffer,
-//     pub offset: u64,
-// }
 
 pub struct Camera {
     pub position: Vec3,
