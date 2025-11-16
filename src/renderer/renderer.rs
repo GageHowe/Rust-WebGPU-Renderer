@@ -150,33 +150,33 @@ impl<'a> RendererState<'a> {
         bind_group_layouts: &HashMap<BindScope, wgpu::BindGroupLayout>,
     ) -> HashMap<PipelineType, wgpu::RenderPipeline> {
         let mut pipelines: HashMap<PipelineType, wgpu::RenderPipeline> = HashMap::new();
-        let mut builder = pipeline::Builder::new(device);
+        let mut pb = pipeline::Builder::new(device);
 
         // Colored Model Pipeline
-        builder.set_shader_module("shaders/colored_model_shader.wgsl", "vs_main", "fs_main");
-        builder.set_pixel_format(config.format);
-        builder.add_vertex_buffer_layout(ModelVertex::get_layout());
-        builder.add_bind_group_layout(&bind_group_layouts[&BindScope::Color]);
-        builder.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
-        builder.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
+        pb.set_shader_module("shaders/colored_model_shader.wgsl", "vs_main", "fs_main");
+        pb.set_pixel_format(config.format);
+        pb.add_vertex_buffer_layout(ModelVertex::get_layout());
+        pb.add_bind_group_layout(&bind_group_layouts[&BindScope::Color]);
+        pb.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
+        pb.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
         pipelines.insert(
             PipelineType::ColoredModel,
-            builder.build("Colored Model Pipeline"),
+            pb.build("Colored Model Pipeline"),
         );
 
         // Textured Model Pipeline
-        builder.set_shader_module("shaders/textured_model_shader.wgsl", "vs_main", "fs_main");
-        builder.set_pixel_format(config.format);
-        builder.add_vertex_buffer_layout(ModelVertex::get_layout());
-        builder.add_bind_group_layout(&bind_group_layouts[&BindScope::Texture]);
-        builder.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
-        builder.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
+        pb.set_shader_module("shaders/textured_model_shader.wgsl", "vs_main", "fs_main");
+        pb.set_pixel_format(config.format);
+        pb.add_vertex_buffer_layout(ModelVertex::get_layout());
+        pb.add_bind_group_layout(&bind_group_layouts[&BindScope::Texture]);
+        pb.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
+        pb.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
         pipelines.insert(
             PipelineType::TexturedModel,
-            builder.build("Textured Model Pipeline"),
+            pb.build("Textured Model Pipeline"),
         );
 
-        pipelines
+        return pipelines;
     }
 
     pub fn load_assets(&mut self, filepath: &str) {
@@ -274,51 +274,6 @@ impl<'a> RendererState<'a> {
         }
     }
 
-    // pub fn update_instance_buffer(&mut self, instances: &[InstanceData]) {
-    //     let instance_data: Vec<InstanceRaw> =
-    //         instances.iter().map(InstanceRaw::from_instance).collect();
-
-    //     let buffer = self
-    //         .device
-    //         .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-    //             label: Some("Instance Buffer"),
-    //             contents: bytemuck::cast_slice(&instance_data),
-    //             usage: wgpu::BufferUsages::VERTEX,
-    //         });
-    //     // self.instance_buffer = Some(buffer);
-    //     // self.instance_count = instances.len();
-    // }
-
-    fn render_model(
-        &self,
-        objs: &Vec<InstanceData>,
-        model: &Model,
-        renderpass: &mut wgpu::RenderPass,
-    ) {
-        // Bind vertex and index buffer
-        renderpass.set_vertex_buffer(0, model.buffer.slice(0..model.ebo_offset));
-        renderpass.set_index_buffer(
-            model.buffer.slice(model.ebo_offset..),
-            wgpu::IndexFormat::Uint32,
-        );
-
-        // Transforms
-        renderpass.set_bind_group(1, &(self.ubo_group.as_ref().unwrap()).bind_groups[0], &[]);
-        //renderpass.set_bind_group(2, &self.proselfjection_ubo.bind_group, &[]);
-
-        for submesh in &model.submeshes {
-            let material = &self.materials[submesh.material_id];
-            renderpass.set_pipeline(&self.render_pipelines[&material.pipeline_type]);
-            renderpass.set_bind_group(0, (material.bind_group).as_ref().unwrap(), &[]);
-            // renderpass.draw_indexed(0..submesh.index_count, submesh.first_index, 0..1);
-            renderpass.draw_indexed(
-                0..submesh.index_count,
-                submesh.first_index,
-                0..objs.len() as u32,
-            );
-        }
-    }
-
     pub fn render(
         &mut self,
         instances: &Vec<InstanceData>,
@@ -331,8 +286,7 @@ impl<'a> RendererState<'a> {
         });
 
         self.update_projection(camera);
-        // self.update_transforms(quads, tris);
-        self.update_transforms(instances); // still don't know why this is necessary to render the cube
+        self.update_transforms(instances);
 
         _ = self.queue.submit([]);
         _ = self.device.poll(wgpu::PollType::wait_indefinitely());
