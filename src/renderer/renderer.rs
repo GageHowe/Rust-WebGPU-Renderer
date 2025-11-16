@@ -261,47 +261,41 @@ impl<'a> RendererState<'a> {
         self.projection_ubo.upload(&view_proj, &self.queue);
     }
 
-    fn update_transforms(&mut self, objects: &Vec<InstanceData>) {
-        for (i, obj) in objects.iter().enumerate() {
-            // let rotation = Mat4::from_rotation_z(obj.angle);
-            let rotation = Mat4::from_quat(obj.rotation);
-            let translation = Mat4::from_translation(obj.position);
-            let matrix = rotation * translation;
-            self.ubo_group
-                .as_mut()
-                .unwrap()
-                .upload(i as u64, &matrix, &self.queue);
-        }
-    }
-
     pub fn render(
         &mut self,
         instances: &Vec<InstanceData>,
         camera: &Camera,
     ) -> Result<(), wgpu::SurfaceError> {
-        // self.device.poll(wgpu::MaintainBase::Wait).ok();
         let _ = self.device.poll(wgpu::PollType::Wait {
             submission_index: None,
             timeout: None,
         });
 
         self.update_projection(camera);
-        self.update_transforms(instances);
 
+        // apply instance transformations
+        for (i, inst) in instances.iter().enumerate() {
+            let rotation = Mat4::from_quat(inst.rotation);
+            let translation = Mat4::from_translation(inst.position);
+            let matrix = rotation * translation;
+            self.ubo_group
+                .as_mut()
+                .unwrap()
+                .upload(i as u64, &matrix, &self.queue);
+        }
+
+        // housekeeping
         _ = self.queue.submit([]);
         _ = self.device.poll(wgpu::PollType::wait_indefinitely());
-
         let drawable = self.surface.get_current_texture()?;
         let image_view_descriptor = wgpu::TextureViewDescriptor::default();
         let image_view = drawable.texture.create_view(&image_view_descriptor);
-
         let command_encoder_descriptor = wgpu::CommandEncoderDescriptor {
             label: Some("Render Encoder"),
         };
         let mut command_encoder = self
             .device
             .create_command_encoder(&command_encoder_descriptor);
-
         let depth_stencil_attachment = wgpu::RenderPassDepthStencilAttachment {
             view: &self.depth_buffer.view,
             depth_ops: Some(wgpu::Operations {
@@ -311,6 +305,7 @@ impl<'a> RendererState<'a> {
             stencil_ops: None,
         };
 
+        // render
         {
             let mut renderpass = command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
@@ -334,12 +329,14 @@ impl<'a> RendererState<'a> {
                 occlusion_query_set: None,
                 timestamp_writes: None,
             });
+
             // set_bind_group allows the shader access to data in the bind group
             renderpass.set_bind_group(2, &self.projection_ubo.bind_group, &[]); // set projection ubo as bindgroup 2 i think
 
             // RENDER THE MODEL INSTANCES
             // self.render_model(instances, &self.models[0], &mut renderpass);
-            let model = &self.models[0]; // inlined
+            // TODO: iterate through all models. For each model, draw all instances in one pass
+            let model = &self.models[0];
             renderpass.set_vertex_buffer(0, model.buffer.slice(0..model.ebo_offset));
             renderpass.set_index_buffer(
                 model.buffer.slice(model.ebo_offset..),
@@ -347,18 +344,12 @@ impl<'a> RendererState<'a> {
             );
 
             renderpass.set_bind_group(1, &(self.ubo_group.as_ref().unwrap()).bind_groups[0], &[]);
-            //renderpass.set_bind_group(2, &self.proselfjection_ubo.bind_group, &[]);
 
             for submesh in &model.submeshes {
                 let material = &self.materials[submesh.material_id];
                 renderpass.set_pipeline(&self.render_pipelines[&material.pipeline_type]);
                 renderpass.set_bind_group(0, (material.bind_group).as_ref().unwrap(), &[]);
                 renderpass.draw_indexed(0..submesh.index_count, submesh.first_index, 0..1);
-                // renderpass.draw_indexed(
-                //     0..submesh.index_count,
-                //     submesh.first_index,
-                //     0..self.object_instances.len() as u32,
-                // );
             }
         }
 
@@ -367,7 +358,6 @@ impl<'a> RendererState<'a> {
             submission_index: None,
             timeout: None,
         });
-
         drawable.present();
         Ok(())
     }

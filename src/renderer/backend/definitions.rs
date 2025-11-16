@@ -41,6 +41,7 @@ pub struct Submesh {
 /// 3d models
 pub struct Model {
     pub buffer: wgpu::Buffer,
+    ///location where the Element Buffer Object (index buffer) starts in `buffer`
     pub ebo_offset: u64,
     pub submeshes: Vec<Submesh>,
 }
