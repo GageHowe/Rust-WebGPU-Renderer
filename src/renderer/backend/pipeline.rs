@@ -1,6 +1,8 @@
 use std::env::current_dir;
 use std::fs;
 
+use wgpu::include_wgsl;
+
 pub struct Builder<'a> {
     shader_filename: String,
     vertex_entry: String,
@@ -67,7 +69,7 @@ impl<'a> Builder<'a> {
 
         let pipeline_layout_descriptor = wgpu::PipelineLayoutDescriptor {
             label: Some("Render Pipeline Layout"),
-            bind_group_layouts: &self.bind_group_layouts,
+            bind_group_layouts: &self.bind_group_layouts, // textures etc
             push_constant_ranges: &[],
         };
         let pipeline_layout: wgpu::PipelineLayout = self
@@ -105,7 +107,7 @@ impl<'a> Builder<'a> {
                 topology: wgpu::PrimitiveTopology::TriangleList,
                 strip_index_format: None,
                 front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Back),
+                cull_mode: Some(wgpu::Face::Back), // backface culling
                 polygon_mode: wgpu::PolygonMode::Fill,
                 unclipped_depth: false,
                 conservative: false,

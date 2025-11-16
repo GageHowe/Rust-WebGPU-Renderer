@@ -3,7 +3,7 @@
 @group(1) @binding(0) var<uniform> model: mat4x4<f32>;
 @group(2) @binding(0) var<uniform> view_projection: mat4x4<f32>;
 
-struct Vertex {
+struct v_in {
     @location(0) position: vec3<f32>,
     @location(1) tex_coord: vec2<f32>,
     @location(2) normal: vec3<f32>,
@@ -16,7 +16,7 @@ struct VertexPayload {
 };
 
 @vertex
-fn vs_main(vertex: Vertex) -> VertexPayload {
+fn vs_main(vertex: v_in) -> VertexPayload {
 
     var out: VertexPayload;
     out.position = view_projection * model * vec4<f32>(vertex.position, 1.0);

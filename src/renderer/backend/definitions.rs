@@ -47,13 +47,13 @@ pub struct Model {
 
 /// describes a vertex with its position, texture coordinates, and normal
 #[repr(C)] // C-style data layout
-pub struct ModelVertex {
+pub struct VertexData {
     pub position: Vec3,
     pub tex_coord: Vec2,
     pub normal: Vec3,
 }
 
-impl ModelVertex {
+impl VertexData {
     pub fn get_layout() -> wgpu::VertexBufferLayout<'static> {
         const ATTRIBUTES: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
             0 => Float32x3,
@@ -61,7 +61,7 @@ impl ModelVertex {
             2 => Float32x3];
 
         wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<ModelVertex>() as wgpu::BufferAddress,
+            array_stride: std::mem::size_of::<VertexData>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &ATTRIBUTES,
         }
@@ -123,7 +123,7 @@ impl Camera {
         }
     }
 
-    pub fn spin(&mut self, d_yaw: f32, d_pitch: f32) {
+    pub fn look(&mut self, d_yaw: f32, d_pitch: f32) {
         self.yaw = (self.yaw + d_yaw) % 360.0;
         if self.yaw < 0.0 {
             self.yaw += 360.0;

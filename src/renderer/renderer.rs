@@ -155,7 +155,7 @@ impl<'a> RendererState<'a> {
         // Colored Model Pipeline
         pb.set_shader_module("shaders/colored_model_shader.wgsl", "vs_main", "fs_main");
         pb.set_pixel_format(config.format);
-        pb.add_vertex_buffer_layout(ModelVertex::get_layout());
+        pb.add_vertex_buffer_layout(VertexData::get_layout());
         pb.add_bind_group_layout(&bind_group_layouts[&BindScope::Color]);
         pb.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
         pb.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
@@ -167,7 +167,7 @@ impl<'a> RendererState<'a> {
         // Textured Model Pipeline
         pb.set_shader_module("shaders/textured_model_shader.wgsl", "vs_main", "fs_main");
         pb.set_pixel_format(config.format);
-        pb.add_vertex_buffer_layout(ModelVertex::get_layout());
+        pb.add_vertex_buffer_layout(VertexData::get_layout());
         pb.add_bind_group_layout(&bind_group_layouts[&BindScope::Texture]);
         pb.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
         pb.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
@@ -314,7 +314,8 @@ impl<'a> RendererState<'a> {
         {
             let mut renderpass = command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                color_attachments: &[Some(
+                    wgpu::RenderPassColorAttachment /* index 0 (@location(0)) */{
                     view: &image_view,
                     resolve_target: None,
                     ops: wgpu::Operations {
@@ -327,12 +328,14 @@ impl<'a> RendererState<'a> {
                         store: wgpu::StoreOp::Store,
                     },
                     depth_slice: None,
-                })],
+                },
+                )],
                 depth_stencil_attachment: Some(depth_stencil_attachment),
                 occlusion_query_set: None,
                 timestamp_writes: None,
             });
-            renderpass.set_bind_group(2, &self.projection_ubo.bind_group, &[]);
+            // set_bind_group allows the shader access to data in the bind group
+            renderpass.set_bind_group(2, &self.projection_ubo.bind_group, &[]); // set projection ubo as bindgroup 2 i think
 
             // RENDER THE MODEL INSTANCES
             // self.render_model(instances, &self.models[0], &mut renderpass);
