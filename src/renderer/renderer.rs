@@ -1,5 +1,5 @@
 // use crate::model::game_objects::{Camera, Object};
-use crate::renderer::backend::definitions::{Camera, InstanceData, Model, Vertex};
+use crate::renderer::backend::definitions::{Camera, InstanceData, Model};
 use crate::renderer::backend::{
     bind_group_layout,
     mesh_builder::ObjLoader,
@@ -28,6 +28,7 @@ pub struct RendererState<'a> {
     pub size: (i32, i32),
     /// struct that wraps a *GLFWWindow handle
     pub window: &'a mut Window,
+    /// map of pre-defined types to wgpu::RenderPipelines
     render_pipelines: HashMap<PipelineType, wgpu::RenderPipeline>,
     pub ubo_group: Option<UBOGroup>,
     projection_ubo: UBO,
@@ -149,38 +150,31 @@ impl<'a> RendererState<'a> {
         bind_group_layouts: &HashMap<BindScope, wgpu::BindGroupLayout>,
     ) -> HashMap<PipelineType, wgpu::RenderPipeline> {
         let mut pipelines: HashMap<PipelineType, wgpu::RenderPipeline> = HashMap::new();
-        let mut pipeline_type: PipelineType;
-        let mut pipeline: wgpu::RenderPipeline;
         let mut builder = pipeline::Builder::new(device);
-        pipeline_type = PipelineType::Simple;
-        builder.set_shader_module("shaders/shader.wgsl", "vs_main", "fs_main");
-        builder.set_pixel_format(config.format);
-        builder.add_vertex_buffer_layout(Vertex::get_layout());
-        builder.add_bind_group_layout(&bind_group_layouts[&BindScope::Texture]);
-        builder.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
-        builder.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
-        pipeline = builder.build("Simple Pipeline");
-        pipelines.insert(pipeline_type, pipeline);
 
-        pipeline_type = PipelineType::ColoredModel;
+        // Colored Model Pipeline
         builder.set_shader_module("shaders/colored_model_shader.wgsl", "vs_main", "fs_main");
         builder.set_pixel_format(config.format);
         builder.add_vertex_buffer_layout(ModelVertex::get_layout());
         builder.add_bind_group_layout(&bind_group_layouts[&BindScope::Color]);
         builder.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
         builder.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
-        pipeline = builder.build("Colored Model Pipeline");
-        pipelines.insert(pipeline_type, pipeline);
+        pipelines.insert(
+            PipelineType::ColoredModel,
+            builder.build("Colored Model Pipeline"),
+        );
 
-        pipeline_type = PipelineType::TexturedModel;
+        // Textured Model Pipeline
         builder.set_shader_module("shaders/textured_model_shader.wgsl", "vs_main", "fs_main");
         builder.set_pixel_format(config.format);
         builder.add_vertex_buffer_layout(ModelVertex::get_layout());
         builder.add_bind_group_layout(&bind_group_layouts[&BindScope::Texture]);
         builder.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
         builder.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
-        pipeline = builder.build("Textured Model Pipeline");
-        pipelines.insert(pipeline_type, pipeline);
+        pipelines.insert(
+            PipelineType::TexturedModel,
+            builder.build("Textured Model Pipeline"),
+        );
 
         pipelines
     }
@@ -384,7 +378,6 @@ impl<'a> RendererState<'a> {
                 occlusion_query_set: None,
                 timestamp_writes: None,
             });
-            renderpass.set_pipeline(&self.render_pipelines[&PipelineType::Simple]);
             renderpass.set_bind_group(2, &self.projection_ubo.bind_group, &[]);
 
             // RENDER THE MODEL INSTANCES

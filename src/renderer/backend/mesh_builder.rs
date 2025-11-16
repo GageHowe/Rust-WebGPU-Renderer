@@ -42,7 +42,6 @@ impl ObjLoader {
 
         // convert materials
         let mtl_dir = obj_path.parent().unwrap_or(Path::new(""));
-
         for m in materials.unwrap_or_default() {
             let mut mat = Material::new();
 
@@ -50,15 +49,10 @@ impl ObjLoader {
             if let Some(path) = m.diffuse_texture {
                 mat.pipeline_type = PipelineType::TexturedModel;
                 mat.filename = Some(mtl_dir.join(path).to_string_lossy().to_string());
-            } else {
+            } else if let Some(diffuse) = /* does the mat specify color? */ m.diffuse {
                 mat.pipeline_type = PipelineType::ColoredModel;
-                mat.color = Some(Vec4::new(
-                    m.diffuse.unwrap()[0],
-                    m.diffuse.unwrap()[1],
-                    m.diffuse.unwrap()[2],
-                    1.0,
-                ));
-            }
+                mat.color = Some(Vec4::new(diffuse[0], diffuse[1], diffuse[2], 1.0));
+            } // otherwise, don't change default material (defaults to purple)
 
             materials_out.push(mat);
         }

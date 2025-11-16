@@ -9,9 +9,8 @@ pub enum BindScope {
 
 #[derive(Eq, Hash, PartialEq, Clone, Copy)]
 pub enum PipelineType {
-    Simple,
-    TexturedModel,
-    ColoredModel,
+    TexturedModel, // if the model has a texture
+    ColoredModel,  // fallback
 }
 
 pub struct Material {
@@ -24,8 +23,8 @@ pub struct Material {
 impl Material {
     pub fn new() -> Self {
         Material {
-            pipeline_type: PipelineType::Simple,
-            color: None,
+            pipeline_type: PipelineType::ColoredModel,
+            color: Some(Vec4::new(0.5, 0.0, 0.5, 1.0)),
             filename: None,
             bind_group: None,
         }
@@ -39,30 +38,31 @@ pub struct Submesh {
     pub material_id: usize,
 }
 
+/// 3d models
 pub struct Model {
     pub buffer: wgpu::Buffer,
     pub ebo_offset: u64,
     pub submeshes: Vec<Submesh>,
 }
 
-/// is this for raw tris? need to safely deprecate
-#[repr(C)] // C-style data layout
-pub struct Vertex {
-    pub position: Vec3,
-    pub color: Vec3,
-}
+// /// is this for raw tris? need to safely deprecate
+// #[repr(C)] // C-style data layout
+// pub struct Vertex {
+//     pub position: Vec3,
+//     pub color: Vec3,
+// }
 
-impl Vertex {
-    pub fn get_layout() -> wgpu::VertexBufferLayout<'static> {
-        const ATTRIBUTES: [wgpu::VertexAttribute; 2] =
-            wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3];
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &ATTRIBUTES,
-        }
-    }
-}
+// impl Vertex {
+//     pub fn get_layout() -> wgpu::VertexBufferLayout<'static> {
+//         const ATTRIBUTES: [wgpu::VertexAttribute; 2] =
+//             wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3];
+//         wgpu::VertexBufferLayout {
+//             array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
+//             step_mode: wgpu::VertexStepMode::Vertex,
+//             attributes: &ATTRIBUTES,
+//         }
+//     }
+// }
 
 /// describes a vertex with its position, texture coordinates, and normal
 #[repr(C)] // C-style data layout
