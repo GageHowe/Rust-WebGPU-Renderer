@@ -5,9 +5,7 @@ pub struct Builder<'a> {
 }
 
 impl<'a> Builder<'a> {
-
     pub fn new(device: &'a wgpu::Device) -> Self {
-
         Builder {
             entries: Vec::new(),
             layout: None,
@@ -24,12 +22,11 @@ impl<'a> Builder<'a> {
     }
 
     pub fn add_material(&mut self, view: &'a wgpu::TextureView, sampler: &'a wgpu::Sampler) {
-
         self.entries.push(wgpu::BindGroupEntry {
             binding: self.entries.len() as u32,
             resource: wgpu::BindingResource::TextureView(view),
         });
-        
+
         self.entries.push(wgpu::BindGroupEntry {
             binding: self.entries.len() as u32,
             resource: wgpu::BindingResource::Sampler(sampler),
@@ -39,20 +36,16 @@ impl<'a> Builder<'a> {
     pub fn add_buffer(&mut self, buffer: &'a wgpu::Buffer, offset: u64) {
         self.entries.push(wgpu::BindGroupEntry {
             binding: self.entries.len() as u32,
-            resource: wgpu::BindingResource::Buffer(
-                wgpu::BufferBinding {
-                    buffer: &buffer,
-                    offset: offset,
-                    size: None,
-                }
-            )
+            resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                buffer: &buffer,
+                offset: offset,
+                size: None,
+            }),
         })
     }
 
     pub fn build(&mut self, label: &str) -> wgpu::BindGroup {
-
-        let bind_group = self.device.create_bind_group(
-        &wgpu::BindGroupDescriptor {
+        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: self.layout.unwrap(),
             entries: &self.entries,
             label: Some(label),

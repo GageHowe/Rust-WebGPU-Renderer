@@ -1,6 +1,6 @@
-use crate::renderer::backend::definitions::{Mesh, Model, PipelineType, Submesh, Vertex};
-use crate::utility::string::split;
-use glm::*;
+use crate::renderer::backend::definitions::{Model, PipelineType, Submesh};
+// use crate::utility::string::split;
+use glam::*;
 use std::collections::HashMap;
 use std::path::Path;
 use wgpu::util::DeviceExt;
@@ -42,22 +42,17 @@ impl ObjLoader {
 
         // convert materials
         let mtl_dir = obj_path.parent().unwrap_or(Path::new(""));
-
         for m in materials.unwrap_or_default() {
             let mut mat = Material::new();
 
+            // if the model has a texture, make sure it runs through the TexturedModel pipeline
             if let Some(path) = m.diffuse_texture {
                 mat.pipeline_type = PipelineType::TexturedModel;
                 mat.filename = Some(mtl_dir.join(path).to_string_lossy().to_string());
-            } else {
+            } else if let Some(diffuse) = /* does the mat specify color? */ m.diffuse {
                 mat.pipeline_type = PipelineType::ColoredModel;
-                mat.color = Some(Vec4::new(
-                    m.diffuse.unwrap()[0],
-                    m.diffuse.unwrap()[1],
-                    m.diffuse.unwrap()[2],
-                    1.0,
-                ));
-            }
+                mat.color = Some(Vec4::new(diffuse[0], diffuse[1], diffuse[2], 1.0));
+            } // otherwise, don't change default material (defaults to purple)
 
             materials_out.push(mat);
         }
@@ -85,7 +80,7 @@ impl ObjLoader {
                 let nx = mesh.normals.get(i * 3).cloned().unwrap_or(0.0);
                 let ny = mesh.normals.get(i * 3 + 1).cloned().unwrap_or(0.0);
                 let nz = mesh.normals.get(i * 3 + 2).cloned().unwrap_or(0.0);
-                let n = glm::normalize(*pre_transform * Vec4::new(nx, ny, nz, 0.0));
+                let n = (*pre_transform * Vec4::new(nx, ny, nz, 0.0)).normalize();
 
                 vertex_data.push(ModelVertex {
                     position: Vec3::new(p.x, p.y, p.z),

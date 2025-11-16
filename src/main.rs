@@ -4,13 +4,14 @@ use std::sync::Mutex;
 
 use glfw::{Action, ClientApiHint, Key, WindowHint, fail_on_errors};
 mod renderer;
-use glm::Vector3;
-use renderer::renderer::State;
-mod model;
-use model::{game_objects::Object, world::World};
+use renderer::backend::definitions::{Camera, InstanceData};
+use renderer::renderer::RendererState;
+// mod model;
+// use model::game_objects::*;
 mod physics;
-mod utility;
+// mod utility;
 use crate::physics::physics::PhysicsWorld;
+use glam::*;
 use physics::*;
 use rapier3d::math::Vector;
 use rapier3d::prelude::*;
@@ -21,7 +22,7 @@ pub struct AppState {
 }
 
 impl AppState {
-    /// consume and guard the physics world
+    /// consume and wrap the physics world reference
     pub fn new(world: PhysicsWorld) -> Self {
         AppState {
             phys_world: Mutex::new(world),
@@ -29,15 +30,25 @@ impl AppState {
     }
 }
 
-/// starts wgpu setup and loop
+fn update_camera(camera: &mut Camera, dt: f32, window: &mut glfw::Window) {
+    let mouse_pos = window.get_cursor_pos();
+    window.set_cursor_pos(400.0, 300.0);
+    let dx = (-40.0 * (mouse_pos.0 - 400.0) / 400.0) as f32;
+    let dy = (-40.0 * (mouse_pos.1 - 300.0) / 300.0) as f32;
+    camera.spin(dx, dy);
+}
+
 async fn run() {
+    // let mut object_instances: Vec<InstanceData> = vec![];
+    let mut camera = Camera::new();
+
     let mut glfw = glfw::init(fail_on_errors!()).unwrap();
     glfw.window_hint(WindowHint::ClientApi(ClientApiHint::NoApi));
     let (mut window, events) = glfw
         .create_window(800, 600, "wgpu", glfw::WindowMode::Windowed)
         .unwrap();
 
-    let mut state = State::new(&mut window).await;
+    let mut state = RendererState::new(&mut window).await;
 
     state.window.set_framebuffer_size_polling(true);
     state.window.set_key_polling(true);
@@ -46,48 +57,36 @@ async fn run() {
     state.window.set_cursor_mode(glfw::CursorMode::Hidden);
 
     state.load_assets("assets/companion_cube/companion_cube.obj");
-
-    // Build world
-    let mut world = World::new();
+    state.load_assets("assets/companion_cube/companion_cube.obj");
 
     // without this the objects fail to render???
-    world.tris.push(Object {
-        position: glm::Vec3::new(0.0, 0.0, 0.0),
-        angle: 0.0,
+    // yeah dumbass, it's an instance of the object
+    state.object_instances.push(InstanceData {
+        position: Vec3::new(0.0, 0.0, 0.0),
+        rotation: glam::quat(0.0, 0.0, 0.0, 0.0),
     });
 
-    state.build_ubos_for_objects(1);
+    state.object_instances.push(InstanceData {
+        position: Vec3::new(1.0, 1.0, 1.0),
+        rotation: glam::quat(0.0, 0.0, 0.0, 0.0),
+    });
+
+    // build_ubos_for_objects(2);
+    state.build_ubos_for_objects(state.object_instances.len());
+    // state.update_instance_buffer(&object_instances);
 
     while !state.window.should_close() {
         glfw.poll_events();
 
-        world.update(16.67, state.window);
+        update_camera(&mut camera, 16.67, state.window);
 
         for (_, event) in glfw::flush_messages(&events) {
             match event {
-                //esc
+                // esc
                 glfw::WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
                     state.window.set_should_close(true)
                 }
 
-                // fall back to world implementations
-                glfw::WindowEvent::Key(key, _, Action::Press, _) => {
-                    world.set_key(key, true);
-                }
-                glfw::WindowEvent::Key(key, _, Action::Release, _) => {
-                    world.keys.insert(key, false);
-                }
-
-                /*world.tris.push(new_object);
-                let true_count = world.tris.len(); // Or all objects if using a unified list
-
-                if true_count > state.ubo.as_ref().unwrap().bind_groups.len() {
-                    state.ubo = Some(UBOGroup::new(&state.device, true_count, &state.bind_group_layouts[&BindScope::UBO]));
-                }
-
-                // On each frame:
-                state.ubo.as_mut().unwrap().upload(i as u64, &world.tris[i].calc_matrix(), &state.queue);
-                 */
                 // window moved
                 glfw::WindowEvent::Pos(..) => {
                     state.update_surface();
@@ -103,7 +102,8 @@ async fn run() {
             }
         }
 
-        match state.render(&world.tris, &world.camera) {
+        let x = state.object_instances.clone(); // TODO: find a more clean way of doing this
+        match state.render(&x, &camera) {
             Ok(_) => {}
             Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
                 state.update_surface();
@@ -114,7 +114,6 @@ async fn run() {
     }
 }
 
-/// starts the physics thread. This should only be running once
 fn physics_thread(appstate: AppState) {
     println!("Physics thread starting");
 

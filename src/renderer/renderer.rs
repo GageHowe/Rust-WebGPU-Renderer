@@ -1,39 +1,48 @@
-use crate::model::game_objects::{Camera, Object};
-use crate::renderer::backend::definitions::{Mesh, Model, Vertex};
+// use crate::model::game_objects::{Camera, Object};
+use crate::renderer::backend::definitions::{Camera, InstanceData, Model};
 use crate::renderer::backend::{
-    bind_group_layout, mesh_builder,
+    bind_group_layout,
     mesh_builder::ObjLoader,
     pipeline,
     texture::{Texture, new_color, new_depth_texture, new_texture},
     ubo::{UBO, UBOGroup},
 };
+use glam::*;
 use glfw::Window;
-use glm::*;
 use std::collections::HashMap;
+use wgpu::VertexBufferLayout;
+use wgpu::util::DeviceExt;
 
-use super::backend::definitions::{BindScope, Material, ModelVertex, PipelineType};
+use super::backend::definitions::*;
 
-pub struct State<'a> {
+pub struct RendererState<'a> {
     /// a handle to our GPU
     instance: wgpu::Instance,
     /// the part of the window that we draw to
     surface: wgpu::Surface<'a>,
     device: wgpu::Device,
+    /// executes recorded CommandBuffer objects and provides convenience methods for writing to buffers
     queue: wgpu::Queue,
+    /// screen size, max latency, etc
     config: wgpu::SurfaceConfiguration,
     pub size: (i32, i32),
     /// struct that wraps a *GLFWWindow handle
     pub window: &'a mut Window,
+    /// map of pre-defined types to wgpu::RenderPipelines
     render_pipelines: HashMap<PipelineType, wgpu::RenderPipeline>,
-    pub ubo: Option<UBOGroup>,
+    pub ubo_group: Option<UBOGroup>,
     projection_ubo: UBO,
     bind_group_layouts: HashMap<BindScope, wgpu::BindGroupLayout>,
     models: Vec<Model>,
     materials: Vec<Material>,
     depth_buffer: Texture,
+    pub object_instances: Vec<InstanceData>,
+    // /// currently only supports one kind of object
+    // instance_buffer: Option<wgpu::Buffer>,
+    // instance_count: usize,
 }
 
-impl<'a> State<'a> {
+impl<'a> RendererState<'a> {
     pub async fn new(window: &'a mut Window) -> Self {
         let size = window.get_framebuffer_size();
 
@@ -88,6 +97,8 @@ impl<'a> State<'a> {
 
         let depth_buffer = new_depth_texture(&device, &config, "Depth Buffer");
 
+        // let i_b = Some(device.create_buffer_init(VertexBufferLayout{
+        // }));
         Self {
             instance,
             window,
@@ -97,12 +108,15 @@ impl<'a> State<'a> {
             config,
             size,
             render_pipelines,
-            ubo: None,
+            ubo_group: None,
             projection_ubo: projection_ubo,
             bind_group_layouts: bind_group_layouts,
             models: Vec::new(),
             materials: Vec::new(),
             depth_buffer,
+            object_instances: Vec::new(),
+            // i_b,
+            // 0,
         }
     }
 
@@ -136,54 +150,44 @@ impl<'a> State<'a> {
         bind_group_layouts: &HashMap<BindScope, wgpu::BindGroupLayout>,
     ) -> HashMap<PipelineType, wgpu::RenderPipeline> {
         let mut pipelines: HashMap<PipelineType, wgpu::RenderPipeline> = HashMap::new();
-        let mut pipeline_type: PipelineType;
-        let mut pipeline: wgpu::RenderPipeline;
-        let mut builder = pipeline::Builder::new(device);
-        pipeline_type = PipelineType::Simple;
-        builder.set_shader_module("shaders/shader.wgsl", "vs_main", "fs_main");
-        builder.set_pixel_format(config.format);
-        builder.add_vertex_buffer_layout(Vertex::get_layout());
-        builder.add_bind_group_layout(&bind_group_layouts[&BindScope::Texture]);
-        builder.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
-        builder.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
-        pipeline = builder.build("Simple Pipeline");
-        pipelines.insert(pipeline_type, pipeline);
+        let mut pb = pipeline::Builder::new(device);
 
-        pipeline_type = PipelineType::ColoredModel;
-        builder.set_shader_module("shaders/colored_model_shader.wgsl", "vs_main", "fs_main");
-        builder.set_pixel_format(config.format);
-        builder.add_vertex_buffer_layout(ModelVertex::get_layout());
-        builder.add_bind_group_layout(&bind_group_layouts[&BindScope::Color]);
-        builder.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
-        builder.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
-        pipeline = builder.build("Colored Model Pipeline");
-        pipelines.insert(pipeline_type, pipeline);
+        // Colored Model Pipeline
+        pb.set_shader_module("shaders/colored_model_shader.wgsl", "vs_main", "fs_main");
+        pb.set_pixel_format(config.format);
+        pb.add_vertex_buffer_layout(ModelVertex::get_layout());
+        pb.add_bind_group_layout(&bind_group_layouts[&BindScope::Color]);
+        pb.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
+        pb.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
+        pipelines.insert(
+            PipelineType::ColoredModel,
+            pb.build("Colored Model Pipeline"),
+        );
 
-        pipeline_type = PipelineType::TexturedModel;
-        builder.set_shader_module("shaders/textured_model_shader.wgsl", "vs_main", "fs_main");
-        builder.set_pixel_format(config.format);
-        builder.add_vertex_buffer_layout(ModelVertex::get_layout());
-        builder.add_bind_group_layout(&bind_group_layouts[&BindScope::Texture]);
-        builder.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
-        builder.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
-        pipeline = builder.build("Textured Model Pipeline");
-        pipelines.insert(pipeline_type, pipeline);
+        // Textured Model Pipeline
+        pb.set_shader_module("shaders/textured_model_shader.wgsl", "vs_main", "fs_main");
+        pb.set_pixel_format(config.format);
+        pb.add_vertex_buffer_layout(ModelVertex::get_layout());
+        pb.add_bind_group_layout(&bind_group_layouts[&BindScope::Texture]);
+        pb.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
+        pb.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
+        pipelines.insert(
+            PipelineType::TexturedModel,
+            pb.build("Textured Model Pipeline"),
+        );
 
-        pipelines
+        return pipelines;
     }
 
     pub fn load_assets(&mut self, filepath: &str) {
         let mut loader = ObjLoader::new();
 
-        // goofy identity matrix
-        let c0 = glm::Vec4::new(1.0, 0.0, 0.0, 0.0);
-        let c1 = glm::Vec4::new(0.0, 1.0, 0.0, 0.0);
-        let c2 = glm::Vec4::new(0.0, 0.0, 1.0, 0.0);
-        let c3 = glm::Vec4::new(0.0, 0.0, 0.0, 1.0);
-        let pre_transform = glm::Matrix4::new(c0, c1, c2, c3);
-
-        self.models
-            .push(loader.load(filepath, &mut self.materials, &self.device, &pre_transform));
+        self.models.push(loader.load(
+            filepath,
+            &mut self.materials,
+            &self.device,
+            &glam::Mat4::IDENTITY,
+        ));
 
         for material in &mut self.materials {
             material.bind_group = match material.pipeline_type {
@@ -227,7 +231,7 @@ impl<'a> State<'a> {
     }
 
     pub fn build_ubos_for_objects(&mut self, object_count: usize) {
-        self.ubo = Some(UBOGroup::new(
+        self.ubo_group = Some(UBOGroup::new(
             &self.device,
             object_count,
             &self.bind_group_layouts[&BindScope::UBO],
@@ -235,99 +239,44 @@ impl<'a> State<'a> {
     }
 
     fn update_projection(&mut self, camera: &Camera) {
-        let c0 = glm::Vec4::new(camera.right.x, camera.up.x, -camera.forwards.x, 0.0);
-        let c1 = glm::Vec4::new(camera.right.y, camera.up.y, -camera.forwards.y, 0.0);
-        let c2 = glm::Vec4::new(camera.right.z, camera.up.z, -camera.forwards.z, 0.0);
-        let a: f32 = -dot(camera.right, camera.position);
-        let b: f32 = -dot(camera.up, camera.position);
-        let c: f32 = dot(camera.forwards, camera.position);
-        let c3 = glm::Vec4::new(a, b, c, 1.0);
-        let view = glm::Matrix4::new(c0, c1, c2, c3);
+        // Vectors for view matrix columns
+        let c0 = Vec4::new(camera.right.x, camera.up.x, -camera.forwards.x, 0.0);
+        let c1 = Vec4::new(camera.right.y, camera.up.y, -camera.forwards.y, 0.0);
+        let c2 = Vec4::new(camera.right.z, camera.up.z, -camera.forwards.z, 0.0);
+        let a: f32 = -camera.right.dot(camera.position);
+        let b: f32 = -camera.up.dot(camera.position);
+        let c: f32 = camera.forwards.dot(camera.position);
+        let c3 = Vec4::new(a, b, c, 1.0);
 
-        let fov_y: f32 = radians(80.0);
+        let view = Mat4::from_cols(c0, c1, c2, c3);
+
+        let fov_y: f32 = 80.0_f32.to_radians();
         let aspect = 4.0 / 3.0;
         let z_near = 0.5;
         let z_far = 1000.0;
-        let projection = ext::perspective(fov_y, aspect, z_near, z_far);
+        let projection = Mat4::perspective_rh(fov_y, aspect, z_near, z_far);
 
         let view_proj = projection * view;
+
         self.projection_ubo.upload(&view_proj, &self.queue);
     }
 
-    fn update_transforms(&mut self, quads: &Vec<Object>, tris: &Vec<Object>) {
-        let mut offset: u64 = 0;
-        for i in 0..quads.len() {
-            let c0 = glm::Vec4::new(1.0, 0.0, 0.0, 0.0);
-            let c1 = glm::Vec4::new(0.0, 1.0, 0.0, 0.0);
-            let c2 = glm::Vec4::new(0.0, 0.0, 1.0, 0.0);
-            let c3 = glm::Vec4::new(0.0, 0.0, 0.0, 1.0);
-            let m1 = glm::Matrix4::new(c0, c1, c2, c3);
-            let m2 = glm::Matrix4::new(c0, c1, c2, c3);
-            let matrix = ext::rotate(&m2, quads[i].angle, glm::Vector3::new(0.0, 0.0, 1.0))
-                * ext::translate(&m1, quads[i].position);
-            self.ubo
-                .as_mut()
-                .unwrap()
-                .upload(offset + i as u64, &matrix, &self.queue);
-        }
-
-        offset = quads.len() as u64;
-        for i in 0..tris.len() {
-            let c0 = glm::Vec4::new(1.0, 0.0, 0.0, 0.0);
-            let c1 = glm::Vec4::new(0.0, 1.0, 0.0, 0.0);
-            let c2 = glm::Vec4::new(0.0, 0.0, 1.0, 0.0);
-            let c3 = glm::Vec4::new(0.0, 0.0, 0.0, 1.0);
-            let m1 = glm::Matrix4::new(c0, c1, c2, c3);
-            let m2 = glm::Matrix4::new(c0, c1, c2, c3);
-            let matrix = ext::rotate(&m2, tris[i].angle, glm::Vector3::new(0.0, 0.0, 1.0))
-                * ext::translate(&m1, tris[i].position);
-            self.ubo
-                .as_mut()
-                .unwrap()
-                .upload(offset + i as u64, &matrix, &self.queue);
-        }
-    }
-
-    fn update_transforms_new(&mut self, objects: &Vec<Object>) {
-        for i in 0..objects.len() {
-            let c0 = glm::Vec4::new(1.0, 0.0, 0.0, 0.0);
-            let c1 = glm::Vec4::new(0.0, 1.0, 0.0, 0.0);
-            let c2 = glm::Vec4::new(0.0, 0.0, 1.0, 0.0);
-            let c3 = glm::Vec4::new(0.0, 0.0, 0.0, 1.0);
-            let m1 = glm::Matrix4::new(c0, c1, c2, c3);
-            let m2 = glm::Matrix4::new(c0, c1, c2, c3);
-            let matrix = ext::rotate(&m2, objects[i].angle, glm::Vector3::new(0.0, 0.0, 1.0))
-                * ext::translate(&m1, objects[i].position);
-            self.ubo
+    fn update_transforms(&mut self, objects: &Vec<InstanceData>) {
+        for (i, obj) in objects.iter().enumerate() {
+            // let rotation = Mat4::from_rotation_z(obj.angle);
+            let rotation = Mat4::from_quat(obj.rotation);
+            let translation = Mat4::from_translation(obj.position);
+            let matrix = rotation * translation;
+            self.ubo_group
                 .as_mut()
                 .unwrap()
                 .upload(i as u64, &matrix, &self.queue);
         }
     }
 
-    fn render_model(&self, model: &Model, renderpass: &mut wgpu::RenderPass) {
-        // Bind vertex and index buffer
-        renderpass.set_vertex_buffer(0, model.buffer.slice(0..model.ebo_offset));
-        renderpass.set_index_buffer(
-            model.buffer.slice(model.ebo_offset..),
-            wgpu::IndexFormat::Uint32,
-        );
-
-        // Transforms
-        renderpass.set_bind_group(1, &(self.ubo.as_ref().unwrap()).bind_groups[0], &[]);
-        //renderpass.set_bind_group(2, &self.projection_ubo.bind_group, &[]);
-
-        for submesh in &model.submeshes {
-            let material = &self.materials[submesh.material_id];
-            renderpass.set_pipeline(&self.render_pipelines[&material.pipeline_type]);
-            renderpass.set_bind_group(0, (material.bind_group).as_ref().unwrap(), &[]);
-            renderpass.draw_indexed(0..submesh.index_count, submesh.first_index, 0..1);
-        }
-    }
-
     pub fn render(
         &mut self,
-        tris: &Vec<Object>,
+        instances: &Vec<InstanceData>,
         camera: &Camera,
     ) -> Result<(), wgpu::SurfaceError> {
         // self.device.poll(wgpu::MaintainBase::Wait).ok();
@@ -337,8 +286,7 @@ impl<'a> State<'a> {
         });
 
         self.update_projection(camera);
-        // self.update_transforms(quads, tris);
-        self.update_transforms_new(tris); // still don't know why this is necessary to render the cube
+        self.update_transforms(instances);
 
         _ = self.queue.submit([]);
         _ = self.device.poll(wgpu::PollType::wait_indefinitely());
@@ -354,21 +302,6 @@ impl<'a> State<'a> {
             .device
             .create_command_encoder(&command_encoder_descriptor);
 
-        let color_attachment = wgpu::RenderPassColorAttachment {
-            view: &image_view,
-            resolve_target: None,
-            ops: wgpu::Operations {
-                load: wgpu::LoadOp::Clear(wgpu::Color {
-                    r: 0.0,
-                    g: 0.0,
-                    b: 0.01,
-                    a: 1.0,
-                }),
-                store: wgpu::StoreOp::Store,
-            },
-            depth_slice: None,
-        };
-
         let depth_stencil_attachment = wgpu::RenderPassDepthStencilAttachment {
             view: &self.depth_buffer.view,
             depth_ops: Some(wgpu::Operations {
@@ -378,21 +311,54 @@ impl<'a> State<'a> {
             stencil_ops: None,
         };
 
-        let render_pass_descriptor = wgpu::RenderPassDescriptor {
-            label: Some("Render Pass"),
-            color_attachments: &[Some(color_attachment)],
-            depth_stencil_attachment: Some(depth_stencil_attachment),
-            occlusion_query_set: None,
-            timestamp_writes: None,
-        };
-
         {
-            let mut renderpass = command_encoder.begin_render_pass(&render_pass_descriptor);
-            renderpass.set_pipeline(&self.render_pipelines[&PipelineType::Simple]);
+            let mut renderpass = command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &image_view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.0,
+                            g: 0.0,
+                            b: 0.01,
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                    depth_slice: None,
+                })],
+                depth_stencil_attachment: Some(depth_stencil_attachment),
+                occlusion_query_set: None,
+                timestamp_writes: None,
+            });
             renderpass.set_bind_group(2, &self.projection_ubo.bind_group, &[]);
 
-            self.render_model(&self.models[0], &mut renderpass);
+            // RENDER THE MODEL INSTANCES
+            // self.render_model(instances, &self.models[0], &mut renderpass);
+            let model = &self.models[0]; // inlined
+            renderpass.set_vertex_buffer(0, model.buffer.slice(0..model.ebo_offset));
+            renderpass.set_index_buffer(
+                model.buffer.slice(model.ebo_offset..),
+                wgpu::IndexFormat::Uint32,
+            );
+
+            renderpass.set_bind_group(1, &(self.ubo_group.as_ref().unwrap()).bind_groups[0], &[]);
+            //renderpass.set_bind_group(2, &self.proselfjection_ubo.bind_group, &[]);
+
+            for submesh in &model.submeshes {
+                let material = &self.materials[submesh.material_id];
+                renderpass.set_pipeline(&self.render_pipelines[&material.pipeline_type]);
+                renderpass.set_bind_group(0, (material.bind_group).as_ref().unwrap(), &[]);
+                renderpass.draw_indexed(0..submesh.index_count, submesh.first_index, 0..1);
+                // renderpass.draw_indexed(
+                //     0..submesh.index_count,
+                //     submesh.first_index,
+                //     0..self.object_instances.len() as u32,
+                // );
+            }
         }
+
         self.queue.submit(std::iter::once(command_encoder.finish()));
         let _ = self.device.poll(wgpu::PollType::Wait {
             submission_index: None,
@@ -400,7 +366,6 @@ impl<'a> State<'a> {
         });
 
         drawable.present();
-
         Ok(())
     }
 }

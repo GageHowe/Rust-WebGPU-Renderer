@@ -1,4 +1,4 @@
-use glm::*;
+use glam::*;
 
 #[derive(Eq, Hash, PartialEq)]
 pub enum BindScope {
@@ -9,9 +9,8 @@ pub enum BindScope {
 
 #[derive(Eq, Hash, PartialEq, Clone, Copy)]
 pub enum PipelineType {
-    Simple,
-    TexturedModel,
-    ColoredModel,
+    TexturedModel, // if the model has a texture
+    ColoredModel,  // fallback
 }
 
 pub struct Material {
@@ -24,8 +23,8 @@ pub struct Material {
 impl Material {
     pub fn new() -> Self {
         Material {
-            pipeline_type: PipelineType::Simple,
-            color: None,
+            pipeline_type: PipelineType::ColoredModel,
+            color: Some(Vec4::new(0.5, 0.0, 0.5, 1.0)),
             filename: None,
             bind_group: None,
         }
@@ -39,30 +38,14 @@ pub struct Submesh {
     pub material_id: usize,
 }
 
+/// 3d models
 pub struct Model {
     pub buffer: wgpu::Buffer,
     pub ebo_offset: u64,
     pub submeshes: Vec<Submesh>,
 }
 
-#[repr(C)] // C-style data layout
-pub struct Vertex {
-    pub position: Vec3,
-    pub color: Vec3,
-}
-
-impl Vertex {
-    pub fn get_layout() -> wgpu::VertexBufferLayout<'static> {
-        const ATTRIBUTES: [wgpu::VertexAttribute; 2] =
-            wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3];
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &ATTRIBUTES,
-        }
-    }
-}
-
+/// describes a vertex with its position, texture coordinates, and normal
 #[repr(C)] // C-style data layout
 pub struct ModelVertex {
     pub position: Vec3,
@@ -85,7 +68,82 @@ impl ModelVertex {
     }
 }
 
-pub struct Mesh {
-    pub buffer: wgpu::Buffer,
-    pub offset: u64,
+pub struct Camera {
+    pub position: Vec3,
+    pub forwards: Vec3,
+    pub right: Vec3,
+    pub up: Vec3,
+    pub yaw: f32,
+    pub pitch: f32,
+}
+
+/// This describes information needed to send information about multiple instances
+/// of a model to the GPU for batching/instancing.
+/// https://sotrh.github.io/learn-wgpu/beginner/tutorial7-instancing/
+#[derive(Clone)]
+pub struct InstanceData {
+    pub position: Vec3,
+    pub rotation: glam::Quat,
+}
+
+/// packed struct for communicating instance transforms to the GPU
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct InstanceRaw {
+    model: [[f32; 4]; 4],
+}
+
+impl InstanceRaw {
+    /// helper for packing an InstanceData into a InstanceRaw to be sent in a buffer to the GPU
+    pub fn from_instance(instance: &InstanceData) -> Self {
+        let rotation = Mat4::from_quat(instance.rotation);
+        let translation = Mat4::from_translation(instance.position);
+        let model = translation * rotation;
+        InstanceRaw {
+            model: model.to_cols_array_2d(),
+        }
+    }
+}
+
+impl Camera {
+    pub fn new() -> Self {
+        let position = Vec3::new(-5.0, 0.0, 2.0);
+        let yaw = 0.0;
+        let pitch = 0.0;
+        let forwards = Vec3::new(1.0, 0.0, 0.0);
+        let right = Vec3::new(0.0, -1.0, 0.0);
+        let up = Vec3::new(0.0, 0.0, 1.0);
+        Camera {
+            position,
+            forwards,
+            right,
+            up,
+            yaw,
+            pitch,
+        }
+    }
+
+    pub fn spin(&mut self, d_yaw: f32, d_pitch: f32) {
+        self.yaw = (self.yaw + d_yaw) % 360.0;
+        if self.yaw < 0.0 {
+            self.yaw += 360.0;
+        }
+        self.pitch = self.pitch + d_pitch;
+        if self.pitch > 89.0 {
+            self.pitch = 89.0;
+        }
+        if self.pitch < -89.0 {
+            self.pitch = -89.0;
+        }
+
+        let c = self.yaw.to_radians().cos();
+        let s = self.yaw.to_radians().sin();
+        let c2 = self.pitch.to_radians().cos();
+        let s2 = self.pitch.to_radians().sin();
+
+        self.forwards = Vec3::new(c * c2, s * c2, s2);
+        self.up = Vec3::new(0.0, 0.0, 1.0);
+        self.right = self.forwards.cross(self.up).normalize();
+        self.up = self.right.cross(self.forwards).normalize();
+    }
 }

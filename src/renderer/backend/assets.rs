@@ -1,4 +1,4 @@
-use glm::*;
+use glam::*;
 
 pub struct AssetManifest {
     pub models: Vec<ModelAsset>,
