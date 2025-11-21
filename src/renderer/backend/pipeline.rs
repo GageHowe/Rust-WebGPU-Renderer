@@ -67,17 +67,15 @@ impl<'a> Builder<'a> {
         };
         let shader_module = self.device.create_shader_module(shader_module_descriptor);
 
-        // // this is new
-        // let push_constant_range = wgpu::PushConstantRange {
-        //     stages: wgpu::ShaderStages::VERTEX, // only vertex shader needs it
-        //     range: 0..64,                       // size of mat4 (16 * 4 bytes)
-        // };
+        let push_constant_range = wgpu::PushConstantRange {
+            stages: wgpu::ShaderStages::VERTEX, // vertex shader needs it
+            range: 0..64,
+        };
 
         let pipeline_layout_descriptor = wgpu::PipelineLayoutDescriptor {
             label: Some("Render Pipeline Layout"),
             bind_group_layouts: &self.bind_group_layouts, // textures etc
-            push_constant_ranges: &[],
-            // push_constant_ranges: &[push_constant_range],
+            push_constant_ranges: &[push_constant_range],
         };
         let pipeline_layout: wgpu::PipelineLayout = self
             .device

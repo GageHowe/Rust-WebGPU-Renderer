@@ -31,7 +31,6 @@ pub struct RendererState<'a> {
     /// map of pre-defined types to wgpu::RenderPipelines
     render_pipelines: HashMap<PipelineType, wgpu::RenderPipeline>,
     pub ubo_group: Option<UBOGroup>,
-    projection_ubo: UBO,
     bind_group_layouts: HashMap<BindScope, wgpu::BindGroupLayout>,
     models: Vec<Model>,
     materials: Vec<Material>,
@@ -60,14 +59,27 @@ impl<'a> RendererState<'a> {
         };
         let adapter = instance.request_adapter(&adapter_descriptor).await.unwrap();
 
+        // let device_descriptor = wgpu::DeviceDescriptor {
+        //     required_features: wgpu::Features::empty(),
+        //     required_limits: wgpu::Limits::default(),
+        //     memory_hints: wgpu::MemoryHints::Performance,
+        //     label: Some("Device"),
+        //     trace: wgpu::Trace::Off,
+        //     experimental_features: wgpu::ExperimentalFeatures::default(),
+        // };
+
         let device_descriptor = wgpu::DeviceDescriptor {
-            required_features: wgpu::Features::empty(),
-            required_limits: wgpu::Limits::default(),
+            required_features: wgpu::Features::PUSH_CONSTANTS,
+            required_limits: wgpu::Limits {
+                max_push_constant_size: 64,
+                ..wgpu::Limits::default()
+            },
             memory_hints: wgpu::MemoryHints::Performance,
             label: Some("Device"),
             trace: wgpu::Trace::Off,
             experimental_features: wgpu::ExperimentalFeatures::default(),
         };
+
         let (device, queue) = adapter.request_device(&device_descriptor).await.unwrap();
         let surface_capabilities = surface.get_capabilities(&adapter);
         let surface_format = surface_capabilities
@@ -90,15 +102,9 @@ impl<'a> RendererState<'a> {
         surface.configure(&device, &config);
 
         let bind_group_layouts = Self::build_bind_group_layouts(&device);
-
         let render_pipelines = Self::build_pipelines(&device, &config, &bind_group_layouts);
-
-        let projection_ubo = UBO::new(&device, &bind_group_layouts[&BindScope::UBO]);
-
         let depth_buffer = new_depth_texture(&device, &config, "Depth Buffer");
 
-        // let i_b = Some(device.create_buffer_init(VertexBufferLayout{
-        // }));
         Self {
             instance,
             window,
@@ -109,14 +115,11 @@ impl<'a> RendererState<'a> {
             size,
             render_pipelines,
             ubo_group: None,
-            projection_ubo: projection_ubo,
             bind_group_layouts: bind_group_layouts,
             models: Vec::new(),
             materials: Vec::new(),
             depth_buffer,
             object_instances: Vec::new(),
-            // i_b,
-            // 0,
         }
     }
 
@@ -157,8 +160,7 @@ impl<'a> RendererState<'a> {
         pb.set_pixel_format(config.format);
         pb.add_vertex_buffer_layout(VertexData::get_layout());
         pb.add_bind_group_layout(&bind_group_layouts[&BindScope::Color]);
-        pb.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
-        pb.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
+        pb.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]); // model matrices only
         pipelines.insert(
             PipelineType::ColoredModel,
             pb.build("Colored Model Pipeline"),
@@ -169,8 +171,7 @@ impl<'a> RendererState<'a> {
         pb.set_pixel_format(config.format);
         pb.add_vertex_buffer_layout(VertexData::get_layout());
         pb.add_bind_group_layout(&bind_group_layouts[&BindScope::Texture]);
-        pb.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
-        pb.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]);
+        pb.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]); // model matrices only
         pipelines.insert(
             PipelineType::TexturedModel,
             pb.build("Textured Model Pipeline"),
@@ -238,7 +239,7 @@ impl<'a> RendererState<'a> {
         ));
     }
 
-    fn update_projection(&mut self, camera: &Camera) {
+    fn update_projection(&mut self, camera: &Camera) -> Mat4 {
         // Vectors for view matrix columns
         let c0 = Vec4::new(camera.right.x, camera.up.x, -camera.forwards.x, 0.0);
         let c1 = Vec4::new(camera.right.y, camera.up.y, -camera.forwards.y, 0.0);
@@ -256,9 +257,7 @@ impl<'a> RendererState<'a> {
         let z_far = 1000.0;
         let projection = Mat4::perspective_rh(fov_y, aspect, z_near, z_far);
 
-        let view_proj = projection * view;
-
-        self.projection_ubo.upload(&view_proj, &self.queue);
+        projection * view
     }
 
     pub fn render(
@@ -330,8 +329,7 @@ impl<'a> RendererState<'a> {
                 timestamp_writes: None,
             });
 
-            // set_bind_group allows the shader access to data in the bind group
-            renderpass.set_bind_group(2, &self.projection_ubo.bind_group, &[]); // set projection ubo as bindgroup 2 i think
+            let view_proj = self.update_projection(camera);
 
             // RENDER THE MODEL INSTANCES
             // self.render_model(instances, &self.models[0], &mut renderpass);
@@ -345,9 +343,18 @@ impl<'a> RendererState<'a> {
 
             renderpass.set_bind_group(1, &(self.ubo_group.as_ref().unwrap()).bind_groups[0], &[]);
 
+            // why do we do this per submesh?
+            // is setting the pipeline per submesh inefficient?
+            // this prevents us from doing instancing right?
             for submesh in &model.submeshes {
                 let material = &self.materials[submesh.material_id];
                 renderpass.set_pipeline(&self.render_pipelines[&material.pipeline_type]);
+                renderpass.set_push_constants(
+                    wgpu::ShaderStages::VERTEX,
+                    0,
+                    mat4_as_bytes(&view_proj),
+                );
+
                 renderpass.set_bind_group(0, (material.bind_group).as_ref().unwrap(), &[]);
                 renderpass.draw_indexed(0..submesh.index_count, submesh.first_index, 0..1);
             }
@@ -360,5 +367,11 @@ impl<'a> RendererState<'a> {
         });
         drawable.present();
         Ok(())
+    }
+}
+
+pub fn mat4_as_bytes(m: &glam::Mat4) -> &[u8] {
+    unsafe {
+        std::slice::from_raw_parts((m as *const Mat4) as *const u8, std::mem::size_of::<Mat4>())
     }
 }
