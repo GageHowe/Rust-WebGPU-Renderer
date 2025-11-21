@@ -83,8 +83,7 @@ async fn run() {
     state.window.set_pos_polling(true);
     state.window.set_cursor_mode(glfw::CursorMode::Hidden);
 
-    state.load_assets("assets/companion_cube/companion_cube.obj");
-    state.load_assets("assets/companion_cube/companion_cube.obj");
+    state.load_assets("companion_cube", "assets/companion_cube/companion_cube.obj");
 
     // spawn a bunch of instances
     let mut rng = rand::rng();
@@ -94,7 +93,7 @@ async fn run() {
             // grid position
             let pos = glam::vec3(x as f32 * spacing, 0.0, y as f32 * spacing);
 
-            // random orientation (random unit quaternion)
+            // random unit quaternion
             let rand_axis = glam::Vec3::new(
                 rng.random_range(-1.0..1.0),
                 rng.random_range(-1.0..1.0),
@@ -106,9 +105,9 @@ async fn run() {
 
             let rot = glam::Quat::from_axis_angle(rand_axis, rand_angle);
 
-            state
-                .object_instances
-                .push(InstanceData::from_pos_rot(pos, rot, 1.0));
+            if let Some(instances) = state.instances.get_mut("companion_cube") {
+                instances.push(InstanceData::from_pos_rot(pos, rot, 1.0));
+            }
         }
     }
 
