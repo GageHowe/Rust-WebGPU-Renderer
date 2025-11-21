@@ -4,7 +4,6 @@ use glam::*;
 pub enum BindScope {
     Texture,
     Color,
-    UBO,
 }
 
 #[derive(Eq, Hash, PartialEq, Clone, Copy)]

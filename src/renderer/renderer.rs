@@ -5,7 +5,6 @@ use crate::renderer::backend::{
     mesh_builder::ObjLoader,
     pipeline,
     texture::{Texture, new_color, new_depth_texture, new_texture},
-    // ubo::UBOGroup,
 };
 use glam::*;
 use glfw::Window;
@@ -28,7 +27,6 @@ pub struct RendererState<'a> {
     pub window: &'a mut Window,
     /// map of pre-defined types to wgpu::RenderPipelines
     render_pipelines: HashMap<PipelineType, wgpu::RenderPipeline>,
-    // pub ubo_group: Option<UBOGroup>,
     bind_group_layouts: HashMap<BindScope, wgpu::BindGroupLayout>,
     models: Vec<Model>, // convert to map of string to Model?
     materials: Vec<Material>,
@@ -112,7 +110,6 @@ impl<'a> RendererState<'a> {
             config,
             size,
             render_pipelines,
-            // ubo_group: None,
             bind_group_layouts: bind_group_layouts,
             models: Vec::new(),
             materials: Vec::new(),
@@ -140,9 +137,6 @@ impl<'a> RendererState<'a> {
         layouts.insert(scope, layout);
 
         builder.add_mat4();
-        scope = BindScope::UBO;
-        layout = builder.build("UBO Bind Group Layout");
-        layouts.insert(scope, layout);
 
         layouts
     }
@@ -188,7 +182,6 @@ impl<'a> RendererState<'a> {
         pb.add_vertex_buffer_layout(VertexData::get_layout());
         pb.add_vertex_buffer_layout(instance_layout.clone());
         pb.add_bind_group_layout(&bind_group_layouts[&BindScope::Color]);
-        // don't add UBO bind group
         pipelines.insert(
             PipelineType::ColoredModel,
             pb.build("Colored Model Pipeline"),
@@ -200,7 +193,6 @@ impl<'a> RendererState<'a> {
         pb.add_vertex_buffer_layout(VertexData::get_layout());
         pb.add_vertex_buffer_layout(instance_layout);
         pb.add_bind_group_layout(&bind_group_layouts[&BindScope::Texture]);
-        // don't add UBO bind group
         pipelines.insert(
             PipelineType::TexturedModel,
             pb.build("Textured Model Pipeline"),
@@ -278,15 +270,7 @@ impl<'a> RendererState<'a> {
             .unwrap();
     }
 
-    // pub fn build_ubos_for_objects(&mut self, object_count: usize) {
-    //     self.ubo_group = Some(UBOGroup::new(
-    //         &self.device,
-    //         object_count,
-    //         &self.bind_group_layouts[&BindScope::UBO],
-    //     ));
-    // }
-
-    fn update_projection(&mut self, camera: &Camera) -> Mat4 {
+    fn update_projection(&self, camera: &Camera) -> Mat4 {
         // Vectors for view matrix columns
         let c0 = Vec4::new(camera.right.x, camera.up.x, -camera.forwards.x, 0.0);
         let c1 = Vec4::new(camera.right.y, camera.up.y, -camera.forwards.y, 0.0);
@@ -307,18 +291,13 @@ impl<'a> RendererState<'a> {
         projection * view
     }
 
-    pub fn render(
-        &mut self,
-        instances: &Vec<InstanceData>,
-        camera: &Camera,
-    ) -> Result<(), wgpu::SurfaceError> {
+    pub fn render(&mut self, camera: &Camera) -> Result<(), wgpu::SurfaceError> {
         let _ = self.device.poll(wgpu::PollType::Wait {
             submission_index: None,
             timeout: None,
         });
 
-        self.update_projection(camera);
-        self.update_instance_buffer(instances);
+        self.update_instance_buffer(&self.object_instances.clone());
 
         // housekeeping
         _ = self.queue.submit([]);

@@ -139,8 +139,7 @@ async fn run() {
             }
         }
 
-        let x = state.object_instances.clone(); // TODO: find a more clean way of doing this
-        match state.render(&x, &camera) {
+        match state.render(&camera) {
             Ok(_) => {}
             Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
                 state.update_surface();
