@@ -1,4 +1,5 @@
 use glam::*;
+use glfw::*;
 
 #[derive(Eq, Hash, PartialEq)]
 pub enum BindScope {
@@ -114,7 +115,41 @@ impl Camera {
         }
     }
 
-    pub fn look(&mut self, d_yaw: f32, d_pitch: f32) {
+    pub fn update(&mut self, dt: f32, window: &mut glfw::Window) {
+        if !window.is_focused() {
+            // TODO: make character trait and make this check in the "super" call
+            return;
+        }
+
+        let speed = 0.5 * dt;
+
+        let mouse_pos = window.get_cursor_pos();
+        window.set_cursor_pos(400.0, 300.0);
+        let dx = (-40.0 * (mouse_pos.0 - 400.0) / 400.0) as f32;
+        let dy = (-40.0 * (mouse_pos.1 - 300.0) / 300.0) as f32;
+        self.look(dx, dy);
+
+        if window.get_key(Key::W) == Action::Press {
+            self.position += self.forwards * speed;
+        }
+        if window.get_key(Key::S) == Action::Press {
+            self.position -= self.forwards * speed;
+        }
+        if window.get_key(Key::A) == Action::Press {
+            self.position -= self.right * speed;
+        }
+        if window.get_key(Key::D) == Action::Press {
+            self.position += self.right * speed;
+        }
+        if window.get_key(Key::Space) == Action::Press {
+            self.position += self.up * speed;
+        }
+        if window.get_key(Key::LeftShift) == Action::Press {
+            self.position -= self.up * speed;
+        }
+    }
+
+    fn look(&mut self, d_yaw: f32, d_pitch: f32) {
         self.yaw = (self.yaw + d_yaw) % 360.0;
         if self.yaw < 0.0 {
             self.yaw += 360.0;

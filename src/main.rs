@@ -35,42 +35,7 @@ impl AppState {
     }
 }
 
-fn update_camera(camera: &mut Camera, dt: f32, window: &mut glfw::Window) {
-    if !window.is_focused() {
-        // TODO: make character trait and make this check in the "super" call
-        return;
-    }
-
-    let speed = 0.5 * dt;
-
-    let mouse_pos = window.get_cursor_pos();
-    window.set_cursor_pos(400.0, 300.0);
-    let dx = (-40.0 * (mouse_pos.0 - 400.0) / 400.0) as f32;
-    let dy = (-40.0 * (mouse_pos.1 - 300.0) / 300.0) as f32;
-    camera.look(dx, dy);
-
-    if window.get_key(Key::W) == Action::Press {
-        camera.position += camera.forwards * speed;
-    }
-    if window.get_key(Key::S) == Action::Press {
-        camera.position -= camera.forwards * speed;
-    }
-    if window.get_key(Key::A) == Action::Press {
-        camera.position -= camera.right * speed;
-    }
-    if window.get_key(Key::D) == Action::Press {
-        camera.position += camera.right * speed;
-    }
-    if window.get_key(Key::Space) == Action::Press {
-        camera.position += camera.up * speed;
-    }
-    if window.get_key(Key::LeftShift) == Action::Press {
-        camera.position -= camera.up * speed;
-    }
-}
-
 async fn run() {
-    // let mut object_instances: Vec<InstanceData> = vec![];
     let mut camera = Camera::new();
 
     let mut glfw = glfw::init(fail_on_errors!()).unwrap();
@@ -118,8 +83,7 @@ async fn run() {
 
     while !state.window.should_close() {
         glfw.poll_events();
-
-        update_camera(&mut camera, 16.67, state.window);
+        camera.update(1000.0 / 60.0, state.window);
 
         for (_, event) in glfw::flush_messages(&events) {
             match event {
