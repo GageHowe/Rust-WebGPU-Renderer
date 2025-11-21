@@ -5,7 +5,7 @@ use crate::renderer::backend::{
     mesh_builder::ObjLoader,
     pipeline,
     texture::{Texture, new_color, new_depth_texture, new_texture},
-    ubo::{UBO, UBOGroup},
+    ubo::UBOGroup,
 };
 use glam::*;
 use glfw::Window;
