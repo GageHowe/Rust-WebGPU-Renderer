@@ -13,9 +13,12 @@ mod physics;
 use crate::physics::physics::PhysicsWorld;
 use glam::*;
 use physics::*;
+use rand::Rng;
 use rapier3d::math::Vector;
 use rapier3d::prelude::*;
 use std::sync::Arc;
+
+// TODO: implement occlusion and frustum culling
 
 pub struct AppState {
     pub phys_world: Mutex<PhysicsWorld>,
@@ -30,12 +33,43 @@ impl AppState {
     }
 }
 
+// fn update_camera(camera: &mut Camera, dt: f32, window: &mut glfw::Window) {
+//     let mouse_pos = window.get_cursor_pos();
+//     window.set_cursor_pos(400.0, 300.0);
+//     let dx = (-40.0 * (mouse_pos.0 - 400.0) / 400.0) as f32;
+//     let dy = (-40.0 * (mouse_pos.1 - 300.0) / 300.0) as f32;
+//     camera.look(dx, dy);
+// }
+
 fn update_camera(camera: &mut Camera, dt: f32, window: &mut glfw::Window) {
+    let speed = 0.5 * dt;
+
+    // --- mouse look ---
     let mouse_pos = window.get_cursor_pos();
     window.set_cursor_pos(400.0, 300.0);
     let dx = (-40.0 * (mouse_pos.0 - 400.0) / 400.0) as f32;
     let dy = (-40.0 * (mouse_pos.1 - 300.0) / 300.0) as f32;
     camera.look(dx, dy);
+
+    // --- movement ---
+    if window.get_key(Key::W) == Action::Press {
+        camera.position += camera.forwards * speed;
+    }
+    if window.get_key(Key::S) == Action::Press {
+        camera.position -= camera.forwards * speed;
+    }
+    if window.get_key(Key::A) == Action::Press {
+        camera.position -= camera.right * speed;
+    }
+    if window.get_key(Key::D) == Action::Press {
+        camera.position += camera.right * speed;
+    }
+    if window.get_key(Key::Space) == Action::Press {
+        camera.position += camera.up * speed;
+    }
+    if window.get_key(Key::LeftShift) == Action::Press {
+        camera.position -= camera.up * speed;
+    }
 }
 
 async fn run() {
@@ -59,21 +93,31 @@ async fn run() {
     state.load_assets("assets/companion_cube/companion_cube.obj");
     state.load_assets("assets/companion_cube/companion_cube.obj");
 
-    // without this the objects fail to render???
-    // yeah dumbass, it's an instance of the object
-    state.object_instances.push(InstanceData {
-        position: Vec3::new(0.0, 0.0, 0.0),
-        rotation: glam::quat(0.0, 0.0, 0.0, 0.0),
-    });
+    // spawn a bunch of instances
+    let mut rng = rand::rng();
+    let spacing = 50.0;
+    for y in 0..100 {
+        for x in 0..100 {
+            // grid position
+            let pos = glam::vec3(x as f32 * spacing, 0.0, y as f32 * spacing);
 
-    state.object_instances.push(InstanceData {
-        position: Vec3::new(1.0, 1.0, 1.0),
-        rotation: glam::quat(0.0, 0.0, 0.0, 0.0),
-    });
+            // random orientation (random unit quaternion)
+            let rand_axis = glam::Vec3::new(
+                rng.random_range(-1.0..1.0),
+                rng.random_range(-1.0..1.0),
+                rng.random_range(-1.0..1.0),
+            )
+            .normalize_or_zero();
 
-    // build_ubos_for_objects(2);
-    state.build_ubos_for_objects(state.object_instances.len());
-    // state.update_instance_buffer(&object_instances);
+            let rand_angle = rng.random_range(0.0..std::f32::consts::TAU);
+
+            let rot = glam::Quat::from_axis_angle(rand_axis, rand_angle);
+
+            state
+                .object_instances
+                .push(InstanceData::from_pos_rot(pos, rot, 1.0));
+        }
+    }
 
     while !state.window.should_close() {
         glfw.poll_events();
@@ -87,15 +131,15 @@ async fn run() {
                     state.window.set_should_close(true)
                 }
 
-                // window moved
-                glfw::WindowEvent::Pos(..) => {
-                    state.update_surface();
-                    state.resize(state.size);
-                }
+                // // window moved
+                // glfw::WindowEvent::Pos(..) => {
+                //     state.update_surface();
+                //     state.resize(state.size);
+                // }
 
                 // window resized
                 glfw::WindowEvent::FramebufferSize(width, height) => {
-                    state.update_surface();
+                    // state.update_surface();
                     state.resize((width, height));
                 }
                 _ => {}

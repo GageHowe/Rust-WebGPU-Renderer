@@ -81,10 +81,20 @@ pub struct Camera {
 /// This describes information needed to send information about multiple instances
 /// of a model to the GPU for batching/instancing.
 /// https://sotrh.github.io/learn-wgpu/beginner/tutorial7-instancing/
-#[derive(Clone)]
+#[repr(C)]
+#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct InstanceData {
-    pub position: Vec3,
-    pub rotation: glam::Quat,
+    pub model: [[f32; 4]; 4],
+}
+
+impl InstanceData {
+    pub fn from_pos_rot(pos: glam::Vec3, rot: glam::Quat, scale: f32) -> Self {
+        let model = glam::Mat4::from_scale_rotation_translation(glam::Vec3::splat(scale), rot, pos);
+
+        Self {
+            model: model.to_cols_array_2d(),
+        }
+    }
 }
 
 /// packed struct for communicating instance transforms to the GPU
@@ -92,18 +102,6 @@ pub struct InstanceData {
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct InstanceRaw {
     model: [[f32; 4]; 4],
-}
-
-impl InstanceRaw {
-    /// helper for packing an InstanceData into a InstanceRaw to be sent in a buffer to the GPU
-    pub fn from_instance(instance: &InstanceData) -> Self {
-        let rotation = Mat4::from_quat(instance.rotation);
-        let translation = Mat4::from_translation(instance.position);
-        let model = translation * rotation;
-        InstanceRaw {
-            model: model.to_cols_array_2d(),
-        }
-    }
 }
 
 impl Camera {

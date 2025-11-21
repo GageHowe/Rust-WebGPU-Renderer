@@ -5,13 +5,11 @@ use crate::renderer::backend::{
     mesh_builder::ObjLoader,
     pipeline,
     texture::{Texture, new_color, new_depth_texture, new_texture},
-    ubo::UBOGroup,
+    // ubo::UBOGroup,
 };
 use glam::*;
 use glfw::Window;
 use std::collections::HashMap;
-use wgpu::VertexBufferLayout;
-use wgpu::util::DeviceExt;
 
 use super::backend::definitions::*;
 
@@ -30,15 +28,14 @@ pub struct RendererState<'a> {
     pub window: &'a mut Window,
     /// map of pre-defined types to wgpu::RenderPipelines
     render_pipelines: HashMap<PipelineType, wgpu::RenderPipeline>,
-    pub ubo_group: Option<UBOGroup>,
+    // pub ubo_group: Option<UBOGroup>,
     bind_group_layouts: HashMap<BindScope, wgpu::BindGroupLayout>,
-    models: Vec<Model>,
+    models: Vec<Model>, // convert to map of string to Model?
     materials: Vec<Material>,
     depth_buffer: Texture,
     pub object_instances: Vec<InstanceData>,
-    // /// currently only supports one kind of object
-    // instance_buffer: Option<wgpu::Buffer>,
-    // instance_count: usize,
+    pub instance_buffer: wgpu::Buffer,
+    pub instance_count: u32,
 }
 
 impl<'a> RendererState<'a> {
@@ -49,6 +46,7 @@ impl<'a> RendererState<'a> {
             backends: wgpu::Backends::all(),
             ..Default::default()
         };
+
         let instance = wgpu::Instance::new(&instance_descriptor);
         let surface = instance.create_surface(window.render_context()).unwrap();
 
@@ -58,15 +56,6 @@ impl<'a> RendererState<'a> {
             force_fallback_adapter: false,
         };
         let adapter = instance.request_adapter(&adapter_descriptor).await.unwrap();
-
-        // let device_descriptor = wgpu::DeviceDescriptor {
-        //     required_features: wgpu::Features::empty(),
-        //     required_limits: wgpu::Limits::default(),
-        //     memory_hints: wgpu::MemoryHints::Performance,
-        //     label: Some("Device"),
-        //     trace: wgpu::Trace::Off,
-        //     experimental_features: wgpu::ExperimentalFeatures::default(),
-        // };
 
         let device_descriptor = wgpu::DeviceDescriptor {
             required_features: wgpu::Features::PUSH_CONSTANTS,
@@ -105,6 +94,14 @@ impl<'a> RendererState<'a> {
         let render_pipelines = Self::build_pipelines(&device, &config, &bind_group_layouts);
         let depth_buffer = new_depth_texture(&device, &config, "Depth Buffer");
 
+        let instance_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Instance Buffer"),
+            size: 1, // resized later
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        let instance_count = 0;
+
         Self {
             instance,
             window,
@@ -114,12 +111,14 @@ impl<'a> RendererState<'a> {
             config,
             size,
             render_pipelines,
-            ubo_group: None,
+            // ubo_group: None,
             bind_group_layouts: bind_group_layouts,
             models: Vec::new(),
             materials: Vec::new(),
             depth_buffer,
             object_instances: Vec::new(),
+            instance_buffer,
+            instance_count,
         }
     }
 
@@ -155,29 +154,76 @@ impl<'a> RendererState<'a> {
         let mut pipelines: HashMap<PipelineType, wgpu::RenderPipeline> = HashMap::new();
         let mut pb = pipeline::Builder::new(device);
 
-        // Colored Model Pipeline
-        pb.set_shader_module("shaders/colored_model_shader.wgsl", "vs_main", "fs_main");
+        let instance_layout = wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<InstanceData>() as u64,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32x4,
+                    offset: 0,
+                    shader_location: 3,
+                },
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32x4,
+                    offset: 16,
+                    shader_location: 4,
+                },
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32x4,
+                    offset: 32,
+                    shader_location: 5,
+                },
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32x4,
+                    offset: 48,
+                    shader_location: 6,
+                },
+            ],
+        };
+
+        // Colored pipeline
+        pb.set_shader_module("shaders/instanced_colored.wgsl", "vs_main", "fs_main");
         pb.set_pixel_format(config.format);
         pb.add_vertex_buffer_layout(VertexData::get_layout());
+        pb.add_vertex_buffer_layout(instance_layout.clone());
         pb.add_bind_group_layout(&bind_group_layouts[&BindScope::Color]);
-        pb.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]); // model matrices only
+        // don't add UBO bind group
         pipelines.insert(
             PipelineType::ColoredModel,
             pb.build("Colored Model Pipeline"),
         );
 
-        // Textured Model Pipeline
-        pb.set_shader_module("shaders/textured_model_shader.wgsl", "vs_main", "fs_main");
+        // Textured pipeline
+        pb.set_shader_module("shaders/instanced_textured.wgsl", "vs_main", "fs_main");
         pb.set_pixel_format(config.format);
         pb.add_vertex_buffer_layout(VertexData::get_layout());
+        pb.add_vertex_buffer_layout(instance_layout);
         pb.add_bind_group_layout(&bind_group_layouts[&BindScope::Texture]);
-        pb.add_bind_group_layout(&bind_group_layouts[&BindScope::UBO]); // model matrices only
+        // don't add UBO bind group
         pipelines.insert(
             PipelineType::TexturedModel,
             pb.build("Textured Model Pipeline"),
         );
 
         return pipelines;
+    }
+
+    pub fn update_instance_buffer(&mut self, instances: &Vec<InstanceData>) {
+        self.instance_count = instances.len() as u32;
+
+        // Reallocate if needed
+        let size = (instances.len() * std::mem::size_of::<InstanceData>()) as u64;
+        if self.instance_buffer.size() < size {
+            self.instance_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("Instance Buffer"),
+                size,
+                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+        }
+
+        self.queue
+            .write_buffer(&self.instance_buffer, 0, bytemuck::cast_slice(instances));
     }
 
     pub fn load_assets(&mut self, filepath: &str) {
@@ -231,13 +277,13 @@ impl<'a> RendererState<'a> {
             .unwrap();
     }
 
-    pub fn build_ubos_for_objects(&mut self, object_count: usize) {
-        self.ubo_group = Some(UBOGroup::new(
-            &self.device,
-            object_count,
-            &self.bind_group_layouts[&BindScope::UBO],
-        ));
-    }
+    // pub fn build_ubos_for_objects(&mut self, object_count: usize) {
+    //     self.ubo_group = Some(UBOGroup::new(
+    //         &self.device,
+    //         object_count,
+    //         &self.bind_group_layouts[&BindScope::UBO],
+    //     ));
+    // }
 
     fn update_projection(&mut self, camera: &Camera) -> Mat4 {
         // Vectors for view matrix columns
@@ -254,7 +300,7 @@ impl<'a> RendererState<'a> {
         let fov_y: f32 = 80.0_f32.to_radians();
         let aspect = 4.0 / 3.0;
         let z_near = 0.5;
-        let z_far = 1000.0;
+        let z_far = 10000.0;
         let projection = Mat4::perspective_rh(fov_y, aspect, z_near, z_far);
 
         projection * view
@@ -271,17 +317,7 @@ impl<'a> RendererState<'a> {
         });
 
         self.update_projection(camera);
-
-        // apply instance transformations
-        for (i, inst) in instances.iter().enumerate() {
-            let rotation = Mat4::from_quat(inst.rotation);
-            let translation = Mat4::from_translation(inst.position);
-            let matrix = rotation * translation;
-            self.ubo_group
-                .as_mut()
-                .unwrap()
-                .upload(i as u64, &matrix, &self.queue);
-        }
+        self.update_instance_buffer(instances);
 
         // housekeeping
         _ = self.queue.submit([]);
@@ -341,11 +377,6 @@ impl<'a> RendererState<'a> {
                 wgpu::IndexFormat::Uint32,
             );
 
-            renderpass.set_bind_group(1, &(self.ubo_group.as_ref().unwrap()).bind_groups[0], &[]);
-
-            // why do we do this per submesh?
-            // is setting the pipeline per submesh inefficient?
-            // this prevents us from doing instancing right?
             for submesh in &model.submeshes {
                 let material = &self.materials[submesh.material_id];
                 renderpass.set_pipeline(&self.render_pipelines[&material.pipeline_type]);
@@ -356,7 +387,14 @@ impl<'a> RendererState<'a> {
                 );
 
                 renderpass.set_bind_group(0, (material.bind_group).as_ref().unwrap(), &[]);
-                renderpass.draw_indexed(0..submesh.index_count, submesh.first_index, 0..1);
+
+                renderpass.set_vertex_buffer(0, model.buffer.slice(0..model.ebo_offset));
+                renderpass.set_vertex_buffer(1, self.instance_buffer.slice(..));
+                renderpass.draw_indexed(
+                    0..submesh.index_count,
+                    submesh.first_index,
+                    0..self.instance_count,
+                );
             }
         }
 
