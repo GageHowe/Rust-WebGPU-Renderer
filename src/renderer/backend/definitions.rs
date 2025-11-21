@@ -68,15 +68,6 @@ impl VertexData {
     }
 }
 
-pub struct Camera {
-    pub position: Vec3,
-    pub forwards: Vec3,
-    pub right: Vec3,
-    pub up: Vec3,
-    pub yaw: f32,
-    pub pitch: f32,
-}
-
 /// This describes information needed to send information about multiple instances
 /// of a model to the GPU for batching/instancing.
 /// https://sotrh.github.io/learn-wgpu/beginner/tutorial7-instancing/
@@ -96,11 +87,13 @@ impl InstanceData {
     }
 }
 
-/// packed struct for communicating instance transforms to the GPU
-#[repr(C)]
-#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct InstanceRaw {
-    model: [[f32; 4]; 4],
+pub struct Camera {
+    pub position: Vec3,
+    pub forwards: Vec3,
+    pub right: Vec3,
+    pub up: Vec3,
+    pub yaw: f32,
+    pub pitch: f32,
 }
 
 impl Camera {

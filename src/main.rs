@@ -6,7 +6,7 @@
 
 use std::sync::Mutex;
 
-use glfw::{Action, ClientApiHint, Key, WindowHint, fail_on_errors};
+use glfw::*;
 mod renderer;
 use renderer::backend::definitions::{Camera, InstanceData};
 use renderer::renderer::RendererState;
@@ -15,7 +15,6 @@ use crate::physics::physics::PhysicsWorld;
 use glam::*;
 use physics::*;
 use rand::Rng;
-use rapier3d::math::Vector;
 use rapier3d::prelude::*;
 use std::sync::Arc;
 mod game_object;
@@ -37,6 +36,11 @@ impl AppState {
 }
 
 fn update_camera(camera: &mut Camera, dt: f32, window: &mut glfw::Window) {
+    if !window.is_focused() {
+        // TODO: make character trait and make this check in the "super" call
+        return;
+    }
+
     let speed = 0.5 * dt;
 
     let mouse_pos = window.get_cursor_pos();
@@ -84,6 +88,7 @@ async fn run() {
     state.window.set_cursor_mode(glfw::CursorMode::Hidden);
 
     state.load_assets("companion_cube", "assets/companion_cube/companion_cube.obj");
+    state.load_assets("spaceship", "assets/spaceship/spaceship.obj");
 
     // spawn a bunch of instances
     let mut rng = rand::rng();
