@@ -34,6 +34,7 @@ pub struct RendererState<'a> {
     materials: Vec<Material>,
     depth_buffer: Texture,
     pub object_instances: Vec<InstanceData>,
+    /// populated every frame via update_instance_buffer
     pub instance_buffer: wgpu::Buffer,
     pub instance_count: u32,
 }

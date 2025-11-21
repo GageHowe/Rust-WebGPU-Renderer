@@ -1,15 +1,16 @@
 // #![feature(slice_as_array)]
 
+// SHIT
+// RAPIER GIVES US AABB BOXES
+// SO WE CAN DO OCCLUSION QUERIES RIGHT???
+
 use std::sync::Mutex;
 
 use glfw::{Action, ClientApiHint, Key, WindowHint, fail_on_errors};
 mod renderer;
 use renderer::backend::definitions::{Camera, InstanceData};
 use renderer::renderer::RendererState;
-// mod model;
-// use model::game_objects::*;
 mod physics;
-// mod utility;
 use crate::physics::physics::PhysicsWorld;
 use glam::*;
 use physics::*;
@@ -17,6 +18,8 @@ use rand::Rng;
 use rapier3d::math::Vector;
 use rapier3d::prelude::*;
 use std::sync::Arc;
+mod game_object;
+use game_object::*;
 
 // TODO: implement occlusion and frustum culling
 
@@ -33,25 +36,15 @@ impl AppState {
     }
 }
 
-// fn update_camera(camera: &mut Camera, dt: f32, window: &mut glfw::Window) {
-//     let mouse_pos = window.get_cursor_pos();
-//     window.set_cursor_pos(400.0, 300.0);
-//     let dx = (-40.0 * (mouse_pos.0 - 400.0) / 400.0) as f32;
-//     let dy = (-40.0 * (mouse_pos.1 - 300.0) / 300.0) as f32;
-//     camera.look(dx, dy);
-// }
-
 fn update_camera(camera: &mut Camera, dt: f32, window: &mut glfw::Window) {
     let speed = 0.5 * dt;
 
-    // --- mouse look ---
     let mouse_pos = window.get_cursor_pos();
     window.set_cursor_pos(400.0, 300.0);
     let dx = (-40.0 * (mouse_pos.0 - 400.0) / 400.0) as f32;
     let dy = (-40.0 * (mouse_pos.1 - 300.0) / 300.0) as f32;
     camera.look(dx, dy);
 
-    // --- movement ---
     if window.get_key(Key::W) == Action::Press {
         camera.position += camera.forwards * speed;
     }
