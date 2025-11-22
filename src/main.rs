@@ -20,6 +20,8 @@ use std::sync::Arc;
 mod game_object;
 use game_object::*;
 
+use winit::*;
+
 // TODO: implement occlusion and frustum culling
 
 pub struct AppState {
