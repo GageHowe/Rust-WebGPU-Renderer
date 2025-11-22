@@ -1,3 +1,4 @@
+/// wraps a wgpu::BindGroupLayoutEntry and a wgpu::device.
 pub struct Builder<'a> {
     entries: Vec<wgpu::BindGroupLayoutEntry>,
     device: &'a wgpu::Device,
@@ -18,7 +19,7 @@ impl<'a> Builder<'a> {
     pub fn add_texture(&mut self) {
         self.entries.push(wgpu::BindGroupLayoutEntry {
             binding: self.entries.len() as u32,
-            visibility: wgpu::ShaderStages::FRAGMENT,
+            visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
             ty: wgpu::BindingType::Texture {
                 multisampled: false,
                 view_dimension: wgpu::TextureViewDimension::D2,
@@ -29,7 +30,7 @@ impl<'a> Builder<'a> {
 
         self.entries.push(wgpu::BindGroupLayoutEntry {
             binding: self.entries.len() as u32,
-            visibility: wgpu::ShaderStages::FRAGMENT,
+            visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
             ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
             count: None,
         });
@@ -38,7 +39,7 @@ impl<'a> Builder<'a> {
     pub fn add_vec4(&mut self) {
         self.entries.push(wgpu::BindGroupLayoutEntry {
             binding: self.entries.len() as u32,
-            visibility: wgpu::ShaderStages::FRAGMENT,
+            visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
             ty: wgpu::BindingType::Buffer {
                 ty: wgpu::BufferBindingType::Uniform,
                 has_dynamic_offset: false,

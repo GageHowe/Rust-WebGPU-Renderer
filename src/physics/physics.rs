@@ -5,7 +5,8 @@ use rapier3d::prelude::*;
 pub struct PhysicsWorld {
     pub rigid_body_set: RigidBodySet,
     pub collider_set: ColliderSet,
-    pub gravity: Vector3<f32>,
+    /// will be 0,0,0 in most cases
+    pub global_gravity: Vector3<f32>,
     pub integration_parameters: IntegrationParameters,
     pub physics_pipeline: PhysicsPipeline,
     pub island_manager: IslandManager,
@@ -23,7 +24,7 @@ impl PhysicsWorld {
         Self {
             rigid_body_set: RigidBodySet::new(),
             collider_set: ColliderSet::new(),
-            gravity,
+            global_gravity: gravity,
             integration_parameters: IntegrationParameters {
                 dt: 1.0 / 60.0,
                 min_ccd_dt: 1.0 / 60.0 / 100.0,
@@ -35,11 +36,12 @@ impl PhysicsWorld {
                 num_internal_pgs_iterations: 1,
                 num_internal_stabilization_iterations: 1,
                 num_solver_iterations: 4,
-                // TODO: what is the optimal value for min_island_size?
+                // what is the optimal value for min_island_size?
                 // It should not be too big so that we don't end up with
                 // huge islands that don't fit in cache.
                 // However we don't want it to be too small and end up with
                 // tons of islands, reducing SIMD parallelism opportunities.
+                // TODO: benchmark
                 min_island_size: 128,
                 normalized_allowed_linear_error: 0.001,
                 normalized_max_corrective_velocity: 10.0,
@@ -62,7 +64,7 @@ impl PhysicsWorld {
 
     pub fn step(&mut self) {
         self.physics_pipeline.step(
-            &self.gravity,
+            &self.global_gravity,
             &self.integration_parameters,
             &mut self.island_manager,
             &mut self.broad_phase,

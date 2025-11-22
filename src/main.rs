@@ -1,21 +1,28 @@
 // #![feature(slice_as_array)]
 
+// SHIT
+// RAPIER GIVES US AABB BOXES
+// SO WE CAN DO OCCLUSION QUERIES RIGHT???
+
 use std::sync::Mutex;
 
-use glfw::{Action, ClientApiHint, Key, WindowHint, fail_on_errors};
+use glfw::*;
 mod renderer;
 use renderer::backend::definitions::{Camera, InstanceData};
 use renderer::renderer::RendererState;
-// mod model;
-// use model::game_objects::*;
 mod physics;
-// mod utility;
 use crate::physics::physics::PhysicsWorld;
 use glam::*;
 use physics::*;
-use rapier3d::math::Vector;
+use rand::Rng;
 use rapier3d::prelude::*;
 use std::sync::Arc;
+mod game_object;
+use game_object::*;
+
+use winit::*;
+
+// TODO: implement occlusion and frustum culling
 
 pub struct AppState {
     pub phys_world: Mutex<PhysicsWorld>,
@@ -30,16 +37,7 @@ impl AppState {
     }
 }
 
-fn update_camera(camera: &mut Camera, dt: f32, window: &mut glfw::Window) {
-    let mouse_pos = window.get_cursor_pos();
-    window.set_cursor_pos(400.0, 300.0);
-    let dx = (-40.0 * (mouse_pos.0 - 400.0) / 400.0) as f32;
-    let dy = (-40.0 * (mouse_pos.1 - 300.0) / 300.0) as f32;
-    camera.spin(dx, dy);
-}
-
 async fn run() {
-    // let mut object_instances: Vec<InstanceData> = vec![];
     let mut camera = Camera::new();
 
     let mut glfw = glfw::init(fail_on_errors!()).unwrap();
@@ -56,29 +54,38 @@ async fn run() {
     state.window.set_pos_polling(true);
     state.window.set_cursor_mode(glfw::CursorMode::Hidden);
 
-    state.load_assets("assets/companion_cube/companion_cube.obj");
-    state.load_assets("assets/companion_cube/companion_cube.obj");
+    state.load_assets("companion_cube", "assets/companion_cube/companion_cube.obj");
+    state.load_assets("spaceship", "assets/spaceship/spaceship.obj");
 
-    // without this the objects fail to render???
-    // yeah dumbass, it's an instance of the object
-    state.object_instances.push(InstanceData {
-        position: Vec3::new(0.0, 0.0, 0.0),
-        rotation: glam::quat(0.0, 0.0, 0.0, 0.0),
-    });
+    // spawn a bunch of instances
+    let mut rng = rand::rng();
+    let spacing = 50.0;
+    for y in 0..100 {
+        for x in 0..100 {
+            // grid position
+            let pos = glam::vec3(x as f32 * spacing, 0.0, y as f32 * spacing);
 
-    state.object_instances.push(InstanceData {
-        position: Vec3::new(1.0, 1.0, 1.0),
-        rotation: glam::quat(0.0, 0.0, 0.0, 0.0),
-    });
+            // random unit quaternion
+            let rand_axis = glam::Vec3::new(
+                rng.random_range(-1.0..1.0),
+                rng.random_range(-1.0..1.0),
+                rng.random_range(-1.0..1.0),
+            )
+            .normalize_or_zero();
 
-    // build_ubos_for_objects(2);
-    state.build_ubos_for_objects(state.object_instances.len());
-    // state.update_instance_buffer(&object_instances);
+            let rand_angle = rng.random_range(0.0..std::f32::consts::TAU);
+
+            let rot = glam::Quat::from_axis_angle(rand_axis, rand_angle);
+
+            if let Some(instances) = state.instances.get_mut("companion_cube") {
+                instances.push(InstanceData::from_pos_rot(pos, rot, 1.0));
+            }
+        }
+    }
 
     while !state.window.should_close() {
         glfw.poll_events();
-
-        update_camera(&mut camera, 16.67, state.window);
+        camera.update(1000.0 / 60.0, state.window);
 
         for (_, event) in glfw::flush_messages(&events) {
             match event {
@@ -87,23 +94,22 @@ async fn run() {
                     state.window.set_should_close(true)
                 }
 
-                // window moved
-                glfw::WindowEvent::Pos(..) => {
-                    state.update_surface();
-                    state.resize(state.size);
-                }
+                // // window moved
+                // glfw::WindowEvent::Pos(..) => {
+                //     state.update_surface();
+                //     state.resize(state.size);
+                // }
 
                 // window resized
                 glfw::WindowEvent::FramebufferSize(width, height) => {
-                    state.update_surface();
+                    // state.update_surface();
                     state.resize((width, height));
                 }
                 _ => {}
             }
         }
 
-        let x = state.object_instances.clone(); // TODO: find a more clean way of doing this
-        match state.render(&x, &camera) {
+        match state.render(&camera) {
             Ok(_) => {}
             Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
                 state.update_surface();

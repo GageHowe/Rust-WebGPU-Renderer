@@ -22,6 +22,8 @@ oddio = "0.7.4"
 tobj = "4.0.3"
 glam = "0.30.9"
 bytemuck = "1.24.0"
+rand = "0.9.2"
+# winit = "0.30.12"
 
 # num-bigint = "0.4.6"
 # num-complex = "0.4.6"

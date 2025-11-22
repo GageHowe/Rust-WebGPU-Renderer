@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use wgpu::util::DeviceExt;
 
-use super::definitions::{Material, ModelVertex};
+use super::definitions::{Material, VertexData};
 
 // From: https://stackoverflow.com/questions/28127165/how-to-convert-struct-to-u8
 pub unsafe fn any_as_u8_slice<T: Sized>(p: &T) -> &[u8] {
@@ -58,7 +58,7 @@ impl ObjLoader {
         }
 
         // collect all vertices + indices + submeshes
-        let mut vertex_data: Vec<ModelVertex> = Vec::new();
+        let mut vertex_data: Vec<VertexData> = Vec::new();
         let mut index_data: Vec<u32> = Vec::new();
         let mut submeshes: Vec<Submesh> = Vec::new();
 
@@ -82,7 +82,7 @@ impl ObjLoader {
                 let nz = mesh.normals.get(i * 3 + 2).cloned().unwrap_or(0.0);
                 let n = (*pre_transform * Vec4::new(nx, ny, nz, 0.0)).normalize();
 
-                vertex_data.push(ModelVertex {
+                vertex_data.push(VertexData {
                     position: Vec3::new(p.x, p.y, p.z),
                     tex_coord: Vec2::new(tx, 1.0 - ty),
                     normal: Vec3::new(n.x, n.y, n.z),
@@ -105,7 +105,7 @@ impl ObjLoader {
         let bytes_verts: &[u8] = unsafe {
             core::slice::from_raw_parts(
                 vertex_data.as_ptr() as *const u8,
-                vertex_data.len() * core::mem::size_of::<ModelVertex>(),
+                vertex_data.len() * core::mem::size_of::<VertexData>(),
             )
         };
 
