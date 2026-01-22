@@ -18,9 +18,11 @@ use rand::Rng;
 use rapier3d::prelude::*;
 use std::sync::Arc;
 mod game_object;
+// use crate::ASSETS_DIR;
 use game_object::*;
+use include_dir::{Dir, include_dir};
 
-use winit::*;
+static ASSETS_DIR: Dir = include_dir!("$CARGO_MANIFEST_DIR/assets");
 
 // TODO: implement occlusion and frustum culling
 
